@@ -19,22 +19,26 @@ export function ExecutionFlow({
   }, [steps.length, steps[steps.length - 1]?.answer]);
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="mb-3 flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+    <div className="flex h-full flex-col rounded-3xl bg-white p-4 shadow-card ring-1 ring-black/5">
+      <div className="mb-3 flex items-center gap-2 rounded-2xl bg-canvas px-3 py-2">
         <span
           className={`h-2.5 w-2.5 rounded-full ${
-            running ? "animate-pulse bg-orange-500" : steps.length ? "bg-green-500" : "bg-gray-400"
+            running
+              ? "animate-pulse bg-brand"
+              : steps.length
+                ? "bg-emerald-500"
+                : "bg-black/25"
           }`}
         />
-        <span className="text-sm font-medium text-gray-700">
+        <span className="text-sm font-medium text-ink-soft">
           {running ? "Executing…" : steps.length ? "Complete" : "Ready"}
         </span>
-        <span className="ml-auto text-xs text-gray-400">{steps.length} steps</span>
+        <span className="ml-auto text-xs text-ink-muted">{steps.length} steps</span>
       </div>
 
       <div className="flex-1 space-y-2 overflow-y-auto pr-1" style={{ maxHeight: "70vh" }}>
         {steps.length === 0 ? (
-          <div className="py-12 text-center text-sm text-gray-400">
+          <div className="py-14 text-center text-sm text-ink-muted">
             Execution steps will appear here.
           </div>
         ) : (

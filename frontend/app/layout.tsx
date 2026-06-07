@@ -1,30 +1,48 @@
 import type { Metadata } from "next";
+import { Red_Hat_Display, Red_Hat_Text, Red_Hat_Mono } from "next/font/google";
 import { Header } from "@/components/Header";
 import "./globals.css";
 
+const display = Red_Hat_Display({
+  subsets: ["latin"],
+  variable: "--font-display",
+  weight: ["400", "500", "700", "800", "900"],
+  display: "swap",
+});
+const text = Red_Hat_Text({
+  subsets: ["latin"],
+  variable: "--font-text",
+  weight: ["400", "500", "700"],
+  display: "swap",
+});
+const mono = Red_Hat_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  weight: ["400", "500"],
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "Agentic RAG Demo",
+  title: "Red Hat · Agentic RAG",
   description: "Interactive demonstrations of RAG and Agentic AI concepts",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="bg-gradient-to-br from-gray-50 to-gray-100">
+    <html
+      lang="en"
+      className={`${display.variable} ${text.variable} ${mono.variable}`}
+    >
+      <body className="min-h-screen font-sans text-ink antialiased">
         <Header />
-        <main className="container mx-auto px-4 py-8">
-          {children}
-        </main>
-        <footer className="bg-gray-800 text-white py-8 mt-12">
-          <div className="container mx-auto px-4 text-center">
-            <p className="text-sm text-gray-300">
-              Agentic RAG Interactive Demo
-              <br />
-              Built with Next.js, React, FastAPI, and Claude AI
+        <main className="mx-auto max-w-7xl px-5 py-10 sm:px-8">{children}</main>
+        <footer className="mt-20 border-t border-black/5 py-10">
+          <div className="mx-auto flex max-w-7xl flex-col items-center gap-1 px-5 text-center sm:px-8">
+            <p className="font-display text-sm font-semibold text-ink">
+              Red Hat <span className="text-ink-muted font-normal">· Agentic RAG demo</span>
+            </p>
+            <p className="text-xs text-ink-muted">
+              Built with Next.js, FastAPI, and pluggable LLMs (Claude · OpenAI · vLLM)
             </p>
           </div>
         </footer>

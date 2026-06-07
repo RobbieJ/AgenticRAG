@@ -6,15 +6,15 @@ import { DemoStepData } from "@/lib/types";
 
 const BAR_PX = 288; // matches h-72
 
-// Violet ramp — darkens with each loop to read as "more burn".
+// Red Hat red ramp — darkens with each loop to read as "more burn".
 const LOOP_COLORS: [string, string][] = [
-  ["#c4b5fd", "#a78bfa"],
-  ["#a78bfa", "#8b5cf6"],
-  ["#8b5cf6", "#7c3aed"],
-  ["#7c3aed", "#6d28d9"],
-  ["#6d28d9", "#5b21b6"],
+  ["#ff8a8a", "#ff5c5c"],
+  ["#ff5c5c", "#ee0000"],
+  ["#ee0000", "#cc0000"],
+  ["#cc0000", "#a30000"],
+  ["#a30000", "#7a0000"],
 ];
-const SYNTH: [string, string] = ["#34d399", "#10b981"]; // generation = emerald
+const SYNTH: [string, string] = ["#52525b", "#3f3f46"]; // generation = graphite (neutral)
 
 interface Segment {
   key: string;
@@ -62,7 +62,7 @@ function Bar({
   width?: string;
 }) {
   return (
-    <div className={`relative h-72 ${width} shrink-0 overflow-hidden rounded-2xl bg-gray-100 ring-1 ring-inset ring-gray-200`}>
+    <div className={`relative h-72 ${width} shrink-0 overflow-hidden rounded-2xl bg-canvas ring-1 ring-inset ring-black/5`}>
       <div className="absolute inset-x-1 bottom-1 flex flex-col-reverse">
         {segments.map((seg, i) => (
           <motion.div
@@ -108,22 +108,22 @@ export function TokenBurn({
     : [];
 
   return (
-    <div className="sticky top-6 rounded-2xl border border-gray-200/70 bg-white/70 p-5 shadow-sm backdrop-blur-xl">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+    <div className="sticky top-6 rounded-2xl border border-black/5 bg-white/70 p-5 shadow-sm backdrop-blur-xl">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
         Token Burn
       </div>
       <div className="mt-1 flex items-baseline gap-1.5">
-        <motion.span className="text-3xl font-semibold tabular-nums text-gray-900">
+        <motion.span className="text-3xl font-semibold tabular-nums text-ink">
           {display}
         </motion.span>
-        <span className="text-sm text-gray-400">tokens</span>
+        <span className="text-sm text-ink-muted">tokens</span>
       </div>
       {multiplier > 0 ? (
-        <div className="mt-0.5 text-xs font-semibold text-violet-600">
+        <div className="mt-0.5 text-xs font-semibold text-brand">
           {multiplier.toFixed(1)}× a classic single-pass RAG
         </div>
       ) : (
-        <div className="mt-0.5 text-xs text-gray-400">
+        <div className="mt-0.5 text-xs text-ink-muted">
           {compareMode ? "running comparison…" : "run the loop to see usage"}
         </div>
       )}
@@ -135,8 +135,8 @@ export function TokenBurn({
             <div className="flex flex-col items-center gap-2">
               <Bar segments={classicSeg} maxScale={maxScale} width="w-14" />
               <div className="text-center">
-                <div className="text-xs font-semibold text-gray-700">Classic</div>
-                <div className="text-[11px] tabular-nums text-gray-400">
+                <div className="text-xs font-semibold text-ink">Classic</div>
+                <div className="text-[11px] tabular-nums text-ink-muted">
                   {classicTotal.toLocaleString()}
                 </div>
               </div>
@@ -144,8 +144,8 @@ export function TokenBurn({
             <div className="flex flex-col items-center gap-2">
               <Bar segments={agg.segments} maxScale={maxScale} width="w-14" />
               <div className="text-center">
-                <div className="text-xs font-semibold text-violet-700">Agentic</div>
-                <div className="text-[11px] tabular-nums text-gray-400">
+                <div className="text-xs font-semibold text-brand">Agentic</div>
+                <div className="text-[11px] tabular-nums text-ink-muted">
                   {agg.total.toLocaleString()}
                 </div>
               </div>
@@ -162,29 +162,29 @@ export function TokenBurn({
                 className="pointer-events-none absolute inset-x-0"
                 style={{ bottom: (agg.baseline / maxScale) * BAR_PX + 4 }}
               >
-                <div className="border-t-2 border-dashed border-gray-500/60" />
+                <div className="border-t-2 border-dashed border-ink/40" />
               </div>
             )}
           </div>
           <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5 text-[11px]">
-            <div className="leading-tight text-gray-500">
-              <span className="font-semibold text-gray-700">Classic RAG</span>
-              <div className="text-gray-400">
+            <div className="leading-tight text-ink-muted">
+              <span className="font-semibold text-ink">Classic RAG</span>
+              <div className="text-ink-muted">
                 {agg.baseline > 0 ? `~${agg.baseline.toLocaleString()} tokens · 1 pass` : "single pass"}
               </div>
             </div>
             <div className="space-y-1.5">
               {agg.segments.length === 0 ? (
-                <div className="text-gray-300">—</div>
+                <div className="text-black/20">—</div>
               ) : (
                 agg.segments
                   .slice()
                   .reverse()
                   .map((seg) => (
-                    <div key={seg.key} className="flex items-center gap-1.5 text-gray-600">
+                    <div key={seg.key} className="flex items-center gap-1.5 text-ink-soft">
                       <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: seg.to }} />
                       <span className="flex-1 truncate">{seg.label}</span>
-                      <span className="tabular-nums text-gray-400">{seg.tokens.toLocaleString()}</span>
+                      <span className="tabular-nums text-ink-muted">{seg.tokens.toLocaleString()}</span>
                     </div>
                   ))
               )}
@@ -195,21 +195,21 @@ export function TokenBurn({
 
       {/* shared legend in compare mode */}
       {compareMode && agg.segments.length > 0 && (
-        <div className="mt-4 space-y-1.5 border-t border-gray-100 pt-3 text-[11px]">
+        <div className="mt-4 space-y-1.5 border-t border-black/5 pt-3 text-[11px]">
           {agg.segments
             .slice()
             .reverse()
             .map((seg) => (
-              <div key={seg.key} className="flex items-center gap-1.5 text-gray-600">
+              <div key={seg.key} className="flex items-center gap-1.5 text-ink-soft">
                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: seg.to }} />
                 <span className="flex-1 truncate">{seg.label}</span>
-                <span className="tabular-nums text-gray-400">{seg.tokens.toLocaleString()}</span>
+                <span className="tabular-nums text-ink-muted">{seg.tokens.toLocaleString()}</span>
               </div>
             ))}
         </div>
       )}
 
-      <p className="mt-4 text-[11px] leading-snug text-gray-400">
+      <p className="mt-4 text-[11px] leading-snug text-ink-muted">
         Each reasoning loop adds plan + evaluate calls on top of generation — agentic
         RAG trades tokens for reliability.
       </p>

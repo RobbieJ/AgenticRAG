@@ -7,7 +7,7 @@ export function RagComparison({ highlight }: { highlight: string[] }) {
     <DiagramFrame viewBox="0 0 860 700">
       <line x1={430} y1={30} x2={430} y2={680} stroke="#cbd5e1" strokeWidth={2} strokeDasharray="6 6" />
       <text x={215} y={40} textAnchor="middle" fontSize={20} fontWeight={700} fill="#1e293b">CLASSIC RAG</text>
-      <text x={645} y={40} textAnchor="middle" fontSize={20} fontWeight={700} fill="#6741d9">AGENTIC RAG</text>
+      <text x={645} y={40} textAnchor="middle" fontSize={20} fontWeight={700} fill="#151515">AGENTIC RAG</text>
 
       {/* Classic column */}
       <FlowBox id="c_query" x={85} y={70} w={260} h={46} label="User query" fill="#a5d8ff" highlight={highlight} />

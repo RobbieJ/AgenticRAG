@@ -56,7 +56,6 @@ export function DemoLayout({ demoType }: { demoType: DemoType }) {
         });
       };
 
-      // Compare mode: run the classic single pass first, then the agentic loop.
       if (config.interactive && compare) {
         startRun("classic");
         stopRef.current = streamDemo(demoType, q, "classic", {
@@ -81,36 +80,43 @@ export function DemoLayout({ demoType }: { demoType: DemoType }) {
   const activeSteps = activeTrack === "classic" ? classic : agentic;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">{config.title}</h1>
-        <p className="mt-1 text-gray-600">{config.description}</p>
+        <h1 className="font-display text-4xl font-extrabold tracking-tight text-ink">
+          {config.title}
+        </h1>
+        <p className="mt-2 max-w-3xl text-lg leading-relaxed text-ink-muted">
+          {config.description}
+        </p>
       </div>
 
       <BackendStatus />
 
       {error && (
-        <div className="rounded-lg border-2 border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <div className="rounded-2xl border border-brand/20 bg-brand-tint px-4 py-3 text-sm text-brand-deep">
           {error} — is the backend running on{" "}
-          <code>{process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"}</code>?
+          <code className="font-mono">
+            {process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"}
+          </code>
+          ?
         </div>
       )}
 
       {config.interactive && (
-        <div className="rounded-xl border-2 border-violet-200 bg-violet-50 p-4">
+        <div className="rounded-3xl bg-white p-5 shadow-card ring-1 ring-black/5">
           <div className="flex flex-col gap-3 sm:flex-row">
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && query && !running && run(query)}
-              placeholder="Ask a question about prompt engineering, RAG, or agentic AI…"
+              placeholder="Ask about prompt engineering, RAG, or agentic AI…"
               disabled={running}
-              className="flex-1 rounded-lg border-2 border-violet-300 px-4 py-2 focus:border-violet-600 focus:outline-none"
+              className="flex-1 rounded-xl border border-black/10 bg-canvas px-4 py-2.5 text-ink outline-none transition placeholder:text-ink-muted focus:border-brand focus:bg-white focus:ring-4 focus:ring-brand/10"
             />
             <button
               onClick={() => run(query)}
               disabled={running || !query}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-600 px-5 py-2 font-semibold text-white transition hover:bg-violet-700 disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-6 py-2.5 font-semibold text-white shadow-[0_6px_18px_-6px_rgba(238,0,0,0.6)] transition hover:bg-brand-dark disabled:opacity-40 disabled:shadow-none"
             >
               {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
               {running ? "Running" : "Run"}
@@ -118,7 +124,7 @@ export function DemoLayout({ demoType }: { demoType: DemoType }) {
             {(agentic.length > 0 || classic.length > 0) && !running && (
               <button
                 onClick={resetAll}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-200 px-4 py-2 font-semibold text-gray-700 transition hover:bg-gray-300"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-black/10 bg-white px-4 py-2.5 font-semibold text-ink transition hover:bg-black/[0.04]"
               >
                 <RotateCcw className="h-4 w-4" /> Reset
               </button>
@@ -126,7 +132,7 @@ export function DemoLayout({ demoType }: { demoType: DemoType }) {
           </div>
 
           {/* Compare-with-classic toggle */}
-          <div className="mt-3 flex items-center gap-3">
+          <div className="mt-4 flex items-center gap-3">
             <button
               type="button"
               role="switch"
@@ -134,7 +140,7 @@ export function DemoLayout({ demoType }: { demoType: DemoType }) {
               onClick={() => !running && setCompare((c) => !c)}
               disabled={running}
               className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition disabled:opacity-50 ${
-                compare ? "bg-violet-600" : "bg-gray-300"
+                compare ? "bg-brand" : "bg-black/15"
               }`}
             >
               <span
@@ -144,15 +150,15 @@ export function DemoLayout({ demoType }: { demoType: DemoType }) {
               />
             </button>
             <div className="text-sm">
-              <span className="font-semibold text-gray-800">Compare with Classic RAG</span>
-              <span className="ml-2 text-gray-500">
+              <span className="font-semibold text-ink">Compare with Classic RAG</span>
+              <span className="ml-2 text-ink-muted">
                 runs the single-pass pipeline first, then the agentic loop — both bars side by side
               </span>
             </div>
           </div>
 
           {examples.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap gap-2">
               {examples.map((ex) => (
                 <button
                   key={ex}
@@ -161,7 +167,7 @@ export function DemoLayout({ demoType }: { demoType: DemoType }) {
                     run(ex);
                   }}
                   disabled={running}
-                  className="rounded-full border border-violet-300 bg-white px-3 py-1 text-xs text-violet-700 transition hover:bg-violet-100 disabled:opacity-50"
+                  className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-medium text-ink-soft transition hover:border-brand/30 hover:bg-brand-tint hover:text-brand disabled:opacity-50"
                 >
                   {ex}
                 </button>
@@ -175,7 +181,7 @@ export function DemoLayout({ demoType }: { demoType: DemoType }) {
         <button
           onClick={() => run()}
           disabled={running}
-          className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-5 py-2 font-semibold text-white transition hover:bg-violet-700 disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-xl bg-brand px-6 py-2.5 font-semibold text-white shadow-[0_6px_18px_-6px_rgba(238,0,0,0.6)] transition hover:bg-brand-dark disabled:opacity-40"
         >
           {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
           {running ? "Playing…" : "Replay"}
@@ -185,14 +191,16 @@ export function DemoLayout({ demoType }: { demoType: DemoType }) {
       <div className="flex flex-col gap-6 xl:flex-row">
         <div className="grid flex-1 grid-cols-1 gap-6 lg:grid-cols-2">
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <h2 className="mb-3 text-lg font-bold text-gray-900">Flow diagram</h2>
+            <h2 className="mb-3 font-display text-lg font-bold tracking-tight text-ink">
+              Flow diagram
+            </h2>
             <DiagramViewer demoType={demoType} highlight={highlight} />
           </motion.div>
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <h2 className="mb-3 text-lg font-bold text-gray-900">
+            <h2 className="mb-3 font-display text-lg font-bold tracking-tight text-ink">
               Live execution
               {compare && (
-                <span className="ml-2 align-middle text-xs font-medium text-gray-400">
+                <span className="ml-2 align-middle text-xs font-medium text-ink-muted">
                   {activeTrack === "classic" ? "· classic pass" : "· agentic loop"}
                 </span>
               )}

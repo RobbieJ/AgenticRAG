@@ -22,7 +22,7 @@ export function WhatIsAgenticAI({ highlight }: { highlight: string[] }) {
 
       {/* autonomy / the agentic loop */}
       <FlowBox id="autonomy" x={40} y={430} w={680} h={120} label="" fill="#f8fafc" highlight={highlight} rounded={14} />
-      <text x={400} y={452} textAnchor="middle" fontSize={13} fontWeight={700} fill="#6741d9">
+      <text x={400} y={452} textAnchor="middle" fontSize={13} fontWeight={700} fill="#ee0000">
         Autonomy — the agentic loop (repeat until confident)
       </text>
 
@@ -31,13 +31,13 @@ export function WhatIsAgenticAI({ highlight }: { highlight: string[] }) {
       <FlowBox id="observe" x={410} y={470} w={120} h={50} label="OBSERVE" fill="#e9ecef" highlight={highlight} />
       <FlowBox id="reflect" x={580} y={470} w={120} h={50} label="REFLECT" fill="#e9ecef" highlight={highlight} />
 
-      <g stroke="#6741d9" strokeWidth={2} markerEnd="url(#arrowhead)">
+      <g stroke="#151515" strokeWidth={2} markerEnd="url(#arrowhead)">
         <line x1={190} y1={495} x2={235} y2={495} />
         <line x1={360} y1={495} x2={405} y2={495} />
         <line x1={530} y1={495} x2={575} y2={495} />
       </g>
       {/* loop back reflect -> plan */}
-      <path d="M 640 520 L 640 540 L 130 540 L 130 520" fill="none" stroke="#6741d9" strokeWidth={2} markerEnd="url(#arrowhead)" />
+      <path d="M 640 520 L 640 540 L 130 540 L 130 520" fill="none" stroke="#151515" strokeWidth={2} markerEnd="url(#arrowhead)" />
     </DiagramFrame>
   );
 }

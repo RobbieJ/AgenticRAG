@@ -13,7 +13,7 @@ export function DiagramViewer({
   highlight: string[];
 }) {
   return (
-    <div className="rounded-xl border-2 border-gray-200 bg-white p-3 shadow-sm">
+    <div className="rounded-3xl bg-white p-4 shadow-card ring-1 ring-black/5">
       {demoType === "what-is-ai" && <WhatIsAgenticAI highlight={highlight} />}
       {demoType === "rag-comparison" && <RagComparison highlight={highlight} />}
       {demoType === "agentic-loop" && <AgenticLoop highlight={highlight} />}

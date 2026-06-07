@@ -2,23 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  color-scheme: light;
+}
+
 html {
   scroll-behavior: smooth;
 }
 
 body {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /* Apple-style soft canvas with a faint Red Hat glow at the top. */
+  background-color: #f5f5f7;
+  background-image:
+    radial-gradient(60rem 30rem at 50% -10rem, rgba(238, 0, 0, 0.06), transparent 70%),
+    linear-gradient(180deg, #fbfbfd 0%, #f5f5f7 100%);
+  background-attachment: fixed;
 }
 
+::selection {
+  background: rgba(238, 0, 0, 0.16);
+}
+
+/* Subtle, modern scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
+  background: rgba(21, 21, 21, 0.18);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: rgba(21, 21, 21, 0.3);
+  background-clip: content-box;
+}
+
+/* Frosted card helper */
+.glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
 }

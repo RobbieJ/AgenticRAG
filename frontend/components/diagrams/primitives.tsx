@@ -46,11 +46,11 @@ export function FlowBox({
         width={w}
         height={h}
         rx={rounded}
-        fill={active ? "#fff7ed" : fill}
-        stroke={active ? "#ea580c" : "#1e293b"}
+        fill={active ? "#fff5f5" : fill}
+        stroke={active ? "#ee0000" : "#151515"}
         animate={{ strokeWidth: active ? 3.5 : 1.5 }}
         transition={{ duration: 0.25 }}
-        style={active ? { filter: "drop-shadow(0 0 10px rgba(234,88,12,0.45))" } : undefined}
+        style={active ? { filter: "drop-shadow(0 0 10px rgba(238,0,0,0.45))" } : undefined}
       />
       <text
         x={x + w / 2}
@@ -93,10 +93,10 @@ export function FlowDiamond({ id, x, y, w, h, label, fill = "#fef9c3", highlight
     <motion.g animate={{ opacity }} transition={{ duration: 0.3 }}>
       <motion.polygon
         points={pts}
-        fill={active ? "#fde68a" : fill}
-        stroke={active ? "#ea580c" : "#1e293b"}
+        fill={active ? "#ffe0e0" : fill}
+        stroke={active ? "#ee0000" : "#151515"}
         animate={{ strokeWidth: active ? 3.5 : 1.5 }}
-        style={active ? { filter: "drop-shadow(0 0 10px rgba(234,88,12,0.45))" } : undefined}
+        style={active ? { filter: "drop-shadow(0 0 10px rgba(238,0,0,0.45))" } : undefined}
       />
       <text x={cx} y={cy - (lines.length - 1) * 8} textAnchor="middle" dominantBaseline="middle" fontSize={12} fontWeight={600} fill="#0f172a">
         {lines.map((ln, i) => (
@@ -114,7 +114,7 @@ export function Arrow({
   y1,
   x2,
   y2,
-  color = "#6741d9",
+  color = "#151515",
   label,
 }: {
   x1: number;
@@ -142,7 +142,7 @@ export function ArrowDefs() {
   return (
     <defs>
       <marker id="arrowhead" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
-        <polygon points="0 0, 8 3, 0 6" fill="#6741d9" />
+        <polygon points="0 0, 8 3, 0 6" fill="#151515" />
       </marker>
     </defs>
   );

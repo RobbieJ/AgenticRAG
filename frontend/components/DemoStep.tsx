@@ -3,58 +3,63 @@
 import { motion } from "framer-motion";
 import { DemoStepData } from "@/lib/types";
 
+// Muted, cohesive phase palette (Red Hat red reserved for the active state).
 const PHASE_COLOR: Record<string, string> = {
-  QUERY: "bg-slate-500",
-  PLAN: "bg-violet-500",
-  RETRIEVE: "bg-sky-500",
+  QUERY: "bg-ink",
+  PLAN: "bg-brand",
+  RETRIEVE: "bg-sky-600",
   EVALUATE: "bg-amber-500",
-  REFINE: "bg-rose-500",
-  GENERATE: "bg-violet-600",
-  VERIFY: "bg-emerald-500",
-  COMPLETE: "bg-green-600",
-  CLASSIC: "bg-sky-500",
-  AGENTIC: "bg-violet-500",
-  ACT: "bg-emerald-500",
+  REFINE: "bg-brand-deep",
+  GENERATE: "bg-ink",
+  VERIFY: "bg-emerald-600",
+  COMPLETE: "bg-emerald-600",
+  CLASSIC: "bg-sky-600",
+  AGENTIC: "bg-brand",
+  ACT: "bg-emerald-600",
   OBSERVE: "bg-amber-500",
-  REFLECT: "bg-rose-500",
-  LOOP: "bg-violet-600",
-  SUMMARY: "bg-green-600",
+  REFLECT: "bg-brand-deep",
+  LOOP: "bg-ink",
+  SUMMARY: "bg-emerald-600",
 };
 
 export function DemoStep({ step, active }: { step: DemoStepData; active: boolean }) {
-  const color = PHASE_COLOR[step.phase] ?? "bg-slate-500";
+  const color = PHASE_COLOR[step.phase] ?? "bg-ink";
+  const tokens = (step.tokens_in ?? 0) + (step.tokens_out ?? 0);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
-      className={`rounded-lg border p-3 ${
-        active ? "border-orange-400 bg-orange-50 shadow-sm" : "border-gray-200 bg-white"
+      className={`rounded-2xl border p-3 transition ${
+        active ? "border-brand/40 bg-brand-tint shadow-sm" : "border-black/5 bg-white"
       }`}
     >
       <div className="flex items-center gap-2">
-        <span className={`inline-flex h-6 items-center rounded-full px-2 text-xs font-bold text-white ${color}`}>
+        <span
+          className={`inline-flex h-6 items-center rounded-full px-2 text-[11px] font-bold tracking-wide text-white ${color}`}
+        >
           {step.phase}
         </span>
-        <span className="font-semibold text-gray-900">{step.title}</span>
+        <span className="font-display font-bold text-ink">{step.title}</span>
         <div className="ml-auto flex items-center gap-2">
-          {(step.tokens_in || step.tokens_out) ? (
-            <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-violet-600">
-              +{((step.tokens_in ?? 0) + (step.tokens_out ?? 0)).toLocaleString()} tok
+          {tokens > 0 ? (
+            <span className="rounded-full bg-brand-tint px-2 py-0.5 text-[10px] font-semibold tabular-nums text-brand">
+              +{tokens.toLocaleString()} tok
             </span>
           ) : null}
           {step.iteration ? (
-            <span className="text-xs text-gray-400">iteration {step.iteration}</span>
+            <span className="text-xs text-ink-muted">iteration {step.iteration}</span>
           ) : null}
         </div>
       </div>
 
       {step.description && (
-        <p className="mt-2 text-sm text-gray-600">{step.description}</p>
+        <p className="mt-2 text-sm leading-relaxed text-ink-soft">{step.description}</p>
       )}
 
       {step.code && (
-        <pre className="mt-2 overflow-x-auto rounded bg-slate-900 p-2 text-xs leading-relaxed text-slate-100">
+        <pre className="mt-2 overflow-x-auto rounded-xl bg-ink p-3 font-mono text-xs leading-relaxed text-white/90">
           <code>{step.code}</code>
         </pre>
       )}
@@ -63,14 +68,14 @@ export function DemoStep({ step, active }: { step: DemoStepData; active: boolean
         <div className="mt-2 space-y-1">
           {step.documents.map((d) => (
             <div key={d.id} className="flex items-center gap-2 text-xs">
-              <span className="font-mono text-gray-400">{d.score.toFixed(3)}</span>
-              <div className="h-1.5 flex-1 rounded bg-gray-100">
+              <span className="font-mono text-ink-muted">{d.score.toFixed(3)}</span>
+              <div className="h-1.5 flex-1 rounded-full bg-black/5">
                 <div
-                  className="h-1.5 rounded bg-sky-400"
+                  className="h-1.5 rounded-full bg-sky-500"
                   style={{ width: `${Math.min(100, d.score * 160)}%` }}
                 />
               </div>
-              <span className="truncate text-gray-700">{d.title}</span>
+              <span className="truncate text-ink-soft">{d.title}</span>
             </div>
           ))}
         </div>
@@ -79,23 +84,25 @@ export function DemoStep({ step, active }: { step: DemoStepData; active: boolean
       {typeof step.score === "number" && (
         <div className="mt-2">
           <div className="flex items-center gap-2">
-            <div className="h-2 flex-1 rounded-full bg-gray-200">
+            <div className="h-2 flex-1 rounded-full bg-black/5">
               <div
-                className={`h-2 rounded-full ${step.score >= 0.7 ? "bg-green-500" : "bg-amber-500"}`}
+                className={`h-2 rounded-full ${step.score >= 0.7 ? "bg-emerald-500" : "bg-amber-500"}`}
                 style={{ width: `${step.score * 100}%` }}
               />
             </div>
-            <span className="text-sm font-semibold">{(step.score * 100).toFixed(0)}%</span>
+            <span className="text-sm font-semibold tabular-nums text-ink">
+              {(step.score * 100).toFixed(0)}%
+            </span>
           </div>
-          {step.reasoning && <p className="mt-1 text-xs italic text-gray-500">{step.reasoning}</p>}
+          {step.reasoning && <p className="mt-1 text-xs italic text-ink-muted">{step.reasoning}</p>}
         </div>
       )}
 
       {step.answer && (
-        <div className="mt-2 whitespace-pre-wrap rounded border border-gray-200 bg-gray-50 p-2 text-sm text-gray-800">
+        <div className="mt-2 whitespace-pre-wrap rounded-xl border border-black/5 bg-canvas p-3 text-sm leading-relaxed text-ink-soft">
           {step.answer}
           {active && step.phase === "GENERATE" && (
-            <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-violet-500 align-middle" />
+            <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-brand align-middle" />
           )}
         </div>
       )}

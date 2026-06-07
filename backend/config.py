@@ -13,16 +13,26 @@ deterministic, offline answers so a presenter can still drive the full UI.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import List, Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Provider = Literal["anthropic", "openai", "vllm"]
 
+_BACKEND_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _BACKEND_DIR.parent
+
 
 class Settings(BaseSettings):
+    # Load env files by absolute path so it works regardless of the working
+    # directory (you run `uvicorn backend.main:app` from the repo root). Both a
+    # repo-root .env and backend/.env are honored; backend/.env wins if both set
+    # the same key. Real environment variables always take precedence over files.
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+        env_file=(str(_REPO_ROOT / ".env"), str(_BACKEND_DIR / ".env")),
+        env_file_encoding="utf-8",
+        extra="ignore",
     )
 
     # --- API metadata ---

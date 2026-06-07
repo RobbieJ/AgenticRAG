@@ -7,9 +7,11 @@ import { DemoStep } from "./DemoStep";
 export function ExecutionFlow({
   steps,
   running,
+  expanded = false,
 }: {
   steps: DemoStepData[];
   running: boolean;
+  expanded?: boolean;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const activeStep = steps.length ? steps[steps.length - 1].step : -1;
@@ -36,7 +38,10 @@ export function ExecutionFlow({
         <span className="ml-auto text-xs text-ink-muted">{steps.length} steps</span>
       </div>
 
-      <div className="flex-1 space-y-2 overflow-y-auto pr-1" style={{ maxHeight: "70vh" }}>
+      <div
+        className="flex-1 space-y-2 overflow-y-auto pr-1"
+        style={{ maxHeight: expanded ? "78vh" : "70vh" }}
+      >
         {steps.length === 0 ? (
           <div className="py-14 text-center text-sm text-ink-muted">
             Execution steps will appear here.

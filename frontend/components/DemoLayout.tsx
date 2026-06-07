@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Play, RotateCcw, Loader2 } from "lucide-react";
+import { Play, RotateCcw, Loader2, Maximize2, Minimize2 } from "lucide-react";
 import { DemoType } from "@/lib/types";
 import { DEMO_CONFIGS } from "@/lib/demo-constants";
 import { useDemo } from "@/hooks/useDemo";
@@ -11,6 +11,13 @@ import { DiagramViewer } from "./DiagramViewer";
 import { ExecutionFlow } from "./ExecutionFlow";
 import { BackendStatus } from "./BackendStatus";
 import { TokenBurn } from "./TokenBurn";
+
+type PanelKey = "diagram" | "execution" | "tokens";
+const TABS: { k: PanelKey; label: string }[] = [
+  { k: "diagram", label: "Flow diagram" },
+  { k: "execution", label: "Live execution" },
+  { k: "tokens", label: "Token Burn" },
+];
 
 export function DemoLayout({ demoType }: { demoType: DemoType }) {
   const config = DEMO_CONFIGS[demoType];
@@ -31,10 +38,12 @@ export function DemoLayout({ demoType }: { demoType: DemoType }) {
   const [query, setQuery] = useState("");
   const [examples, setExamples] = useState<string[]>([]);
   const [compare, setCompare] = useState(false);
+  const [focus, setFocus] = useState<PanelKey | null>(null);
   const stopRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     resetAll();
+    setFocus(null);
     return () => stopRef.current?.();
   }, [demoType, resetAll]);
 
@@ -78,6 +87,43 @@ export function DemoLayout({ demoType }: { demoType: DemoType }) {
   }, [config.interactive, run]);
 
   const activeSteps = activeTrack === "classic" ? classic : agentic;
+
+  const executionExtra = compare ? (
+    <span className="ml-2 align-middle text-xs font-medium text-ink-muted">
+      · {activeTrack === "classic" ? "classic pass" : "agentic loop"}
+    </span>
+  ) : null;
+
+  const renderComponent = (key: PanelKey, focused: boolean) => {
+    if (key === "diagram") return <DiagramViewer demoType={demoType} highlight={highlight} />;
+    if (key === "execution")
+      return <ExecutionFlow steps={activeSteps} running={running} expanded={focused} />;
+    return (
+      <TokenBurn
+        agentic={agentic}
+        classic={compare ? classic : null}
+        barHeight={focused ? 460 : 288}
+      />
+    );
+  };
+
+  const panelHeader = (key: PanelKey, title: string, extra?: React.ReactNode) => (
+    <button
+      onClick={() => setFocus(key)}
+      className="group mb-3 flex w-full items-center justify-between text-left"
+    >
+      <h2 className="font-display text-lg font-bold tracking-tight text-ink">
+        {title}
+        {extra}
+      </h2>
+      <span
+        title="Expand"
+        className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white text-ink-muted shadow-sm ring-1 ring-black/5 transition group-hover:text-brand group-hover:ring-brand/30"
+      >
+        <Maximize2 className="h-3.5 w-3.5" />
+      </span>
+    </button>
+  );
 
   return (
     <div className="space-y-6">
@@ -131,7 +177,6 @@ export function DemoLayout({ demoType }: { demoType: DemoType }) {
             )}
           </div>
 
-          {/* Compare-with-classic toggle */}
           <div className="mt-4 flex items-center gap-3">
             <button
               type="button"
@@ -188,33 +233,77 @@ export function DemoLayout({ demoType }: { demoType: DemoType }) {
         </button>
       )}
 
-      <div className="flex flex-col gap-6 xl:flex-row">
-        <div className="grid flex-1 grid-cols-1 gap-6 lg:grid-cols-2">
+      {/* ---- Interactive: two columns + expandable panels ---- */}
+      {config.interactive ? (
+        focus ? (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              {TABS.map((t) => (
+                <button
+                  key={t.k}
+                  onClick={() => setFocus(t.k)}
+                  className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+                    focus === t.k
+                      ? "bg-brand text-white shadow-[0_6px_18px_-6px_rgba(238,0,0,0.6)]"
+                      : "border border-black/10 bg-white text-ink-soft hover:bg-black/[0.04]"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+              <button
+                onClick={() => setFocus(null)}
+                className="ml-auto inline-flex items-center gap-1 rounded-full border border-black/10 bg-white px-4 py-1.5 text-sm font-medium text-ink transition hover:bg-black/[0.04]"
+              >
+                <Minimize2 className="h-4 w-4" /> Collapse
+              </button>
+            </div>
+            <motion.div
+              key={focus}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              {renderComponent(focus, true)}
+            </motion.div>
+          </motion.div>
+        ) : (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+            <div className="space-y-6 lg:col-span-5">
+              <section>
+                {panelHeader("diagram", "Flow diagram")}
+                {renderComponent("diagram", false)}
+              </section>
+              <section>
+                {panelHeader("tokens", "Token Burn")}
+                {renderComponent("tokens", false)}
+              </section>
+            </div>
+            <div className="lg:col-span-7">
+              <section>
+                {panelHeader("execution", "Live execution", executionExtra)}
+                {renderComponent("execution", false)}
+              </section>
+            </div>
+          </div>
+        )
+      ) : (
+        // ---- Non-interactive demos: diagram + execution ----
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div>
             <h2 className="mb-3 font-display text-lg font-bold tracking-tight text-ink">
               Flow diagram
             </h2>
             <DiagramViewer demoType={demoType} highlight={highlight} />
-          </motion.div>
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          </div>
+          <div>
             <h2 className="mb-3 font-display text-lg font-bold tracking-tight text-ink">
               Live execution
-              {compare && (
-                <span className="ml-2 align-middle text-xs font-medium text-ink-muted">
-                  {activeTrack === "classic" ? "· classic pass" : "· agentic loop"}
-                </span>
-              )}
             </h2>
             <ExecutionFlow steps={activeSteps} running={running} />
-          </motion.div>
+          </div>
         </div>
-
-        {config.interactive && (
-          <aside className="xl:w-72 xl:shrink-0">
-            <TokenBurn agentic={agentic} classic={compare ? classic : null} />
-          </aside>
-        )}
-      </div>
+      )}
     </div>
   );
 }

@@ -4,8 +4,6 @@ import { useEffect, useMemo } from "react";
 import { motion, useSpring, useTransform } from "framer-motion";
 import { DemoStepData } from "@/lib/types";
 
-const BAR_PX = 288; // matches h-72
-
 // Red Hat red ramp — darkens with each loop to read as "more burn".
 const LOOP_COLORS: [string, string][] = [
   ["#ff8a8a", "#ff5c5c"],
@@ -55,20 +53,25 @@ function agenticSegments(steps: DemoStepData[]): { segments: Segment[]; total: n
 function Bar({
   segments,
   maxScale,
+  barHeight,
   width = "w-16",
 }: {
   segments: Segment[];
   maxScale: number;
+  barHeight: number;
   width?: string;
 }) {
   return (
-    <div className={`relative h-72 ${width} shrink-0 overflow-hidden rounded-2xl bg-canvas ring-1 ring-inset ring-black/5`}>
+    <div
+      className={`relative ${width} shrink-0 overflow-hidden rounded-2xl bg-canvas ring-1 ring-inset ring-black/5`}
+      style={{ height: barHeight }}
+    >
       <div className="absolute inset-x-1 bottom-1 flex flex-col-reverse">
         {segments.map((seg, i) => (
           <motion.div
             key={seg.key}
             initial={{ height: 0 }}
-            animate={{ height: (seg.tokens / maxScale) * BAR_PX }}
+            animate={{ height: (seg.tokens / maxScale) * barHeight }}
             transition={{ type: "spring", stiffness: 120, damping: 22 }}
             style={{ background: `linear-gradient(to top, ${seg.from}, ${seg.to})` }}
             className={i === segments.length - 1 ? "w-full rounded-t-lg" : "w-full"}
@@ -82,9 +85,11 @@ function Bar({
 export function TokenBurn({
   agentic,
   classic,
+  barHeight = 288,
 }: {
   agentic: DemoStepData[];
   classic: DemoStepData[] | null;
+  barHeight?: number;
 }) {
   const agg = useMemo(() => agenticSegments(agentic), [agentic]);
   const classicTotal = useMemo(
@@ -108,7 +113,7 @@ export function TokenBurn({
     : [];
 
   return (
-    <div className="sticky top-6 rounded-2xl border border-black/5 bg-white/70 p-5 shadow-sm backdrop-blur-xl">
+    <div className="rounded-3xl bg-white/70 p-5 shadow-card ring-1 ring-black/5 backdrop-blur-xl">
       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
         Token Burn
       </div>
@@ -131,9 +136,9 @@ export function TokenBurn({
       {compareMode ? (
         // ---- side-by-side comparison ----
         <div className="mt-5">
-          <div className="flex items-end justify-center gap-6">
+          <div className="flex items-end justify-center gap-8">
             <div className="flex flex-col items-center gap-2">
-              <Bar segments={classicSeg} maxScale={maxScale} width="w-14" />
+              <Bar segments={classicSeg} maxScale={maxScale} barHeight={barHeight} width="w-16" />
               <div className="text-center">
                 <div className="text-xs font-semibold text-ink">Classic</div>
                 <div className="text-[11px] tabular-nums text-ink-muted">
@@ -142,7 +147,7 @@ export function TokenBurn({
               </div>
             </div>
             <div className="flex flex-col items-center gap-2">
-              <Bar segments={agg.segments} maxScale={maxScale} width="w-14" />
+              <Bar segments={agg.segments} maxScale={maxScale} barHeight={barHeight} width="w-16" />
               <div className="text-center">
                 <div className="text-xs font-semibold text-brand">Agentic</div>
                 <div className="text-[11px] tabular-nums text-ink-muted">
@@ -156,11 +161,11 @@ export function TokenBurn({
         // ---- single agentic bar with a classic baseline marker ----
         <div className="mt-5 flex items-stretch gap-3">
           <div className="relative">
-            <Bar segments={agg.segments} maxScale={maxScale} />
+            <Bar segments={agg.segments} maxScale={maxScale} barHeight={barHeight} />
             {agg.baseline > 0 && agg.total > 0 && (
               <div
                 className="pointer-events-none absolute inset-x-0"
-                style={{ bottom: (agg.baseline / maxScale) * BAR_PX + 4 }}
+                style={{ bottom: (agg.baseline / maxScale) * barHeight + 4 }}
               >
                 <div className="border-t-2 border-dashed border-ink/40" />
               </div>
@@ -195,7 +200,7 @@ export function TokenBurn({
 
       {/* shared legend in compare mode */}
       {compareMode && agg.segments.length > 0 && (
-        <div className="mt-4 space-y-1.5 border-t border-black/5 pt-3 text-[11px]">
+        <div className="mx-auto mt-4 max-w-xs space-y-1.5 border-t border-black/5 pt-3 text-[11px]">
           {agg.segments
             .slice()
             .reverse()

@@ -100,8 +100,8 @@ export function DemoLayout({ demoType }: { demoType: DemoType }) {
     return (
       <TokenBurn
         agentic={agentic}
-        classic={compare ? classic : null}
-        barHeight={focused ? 460 : 288}
+        classic={classic}
+        barHeight={focused ? 460 : 264}
       />
     );
   };

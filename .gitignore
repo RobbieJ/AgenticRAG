@@ -48,3 +48,7 @@ yarn-error.log*
 # Cache
 .cache/
 .pytest_cache/
+
+# Next.js / TS build artifacts
+*.tsbuildinfo
+next-env.d.ts

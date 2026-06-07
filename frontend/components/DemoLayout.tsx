@@ -1,211 +1,140 @@
 "use client";
 
+import { useCallback, useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
+import { Play, RotateCcw, Loader2 } from "lucide-react";
+import { DemoType } from "@/lib/types";
+import { DEMO_CONFIGS } from "@/lib/demo-constants";
+import { useDemo } from "@/hooks/useDemo";
+import { fetchExamples, streamDemo } from "@/lib/api-client";
 import { DiagramViewer } from "./DiagramViewer";
 import { ExecutionFlow } from "./ExecutionFlow";
-import { motion } from "framer-motion";
-import { useDemo } from "@/hooks/useDemo";
-import { DemoType } from "@/lib/types";
-import { useState, useEffect } from "react";
-import { executeDemoSSE } from "@/lib/api-client";
+import { BackendStatus } from "./BackendStatus";
 
-interface DemoLayoutProps {
-  demoType: DemoType;
-  title: string;
-  description: string;
-  interactive?: boolean;
-  exampleQueries?: string[];
-}
+export function DemoLayout({ demoType }: { demoType: DemoType }) {
+  const config = DEMO_CONFIGS[demoType];
+  const { steps, highlight, running, error, start, ingest, finish, fail, reset } = useDemo();
 
-export function DemoLayout({
-  demoType,
-  title,
-  description,
-  interactive = false,
-  exampleQueries = [],
-}: DemoLayoutProps) {
-  const { executionResults, highlightedElements, isExecuting, reset, updateStep } = useDemo();
-  const [isRunning, setIsRunning] = useState(false);
   const [query, setQuery] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [examples, setExamples] = useState<string[]>([]);
+  const stopRef = useRef<(() => void) | null>(null);
 
-  const handleExecute = async (demoQuery?: string) => {
+  // Reset store when switching demos; stop any in-flight stream.
+  useEffect(() => {
     reset();
-    setIsRunning(true);
-    setError(null);
-
-    try {
-      await executeDemoSSE(
-        {
-          demoType,
-          query: demoQuery || query || undefined,
-        },
-        (event) => {
-          updateStep(event);
-        },
-        (err) => {
-          setError(err.message);
-          setIsRunning(false);
-        },
-        () => {
-          setIsRunning(false);
-        }
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-      setIsRunning(false);
-    }
-  };
+    return () => stopRef.current?.();
+  }, [demoType, reset]);
 
   useEffect(() => {
-    if (!interactive) {
-      handleExecute();
+    if (config.interactive) fetchExamples().then(setExamples);
+  }, [config.interactive]);
+
+  const run = useCallback(
+    (q?: string) => {
+      stopRef.current?.();
+      start();
+      stopRef.current = streamDemo(demoType, q, {
+        onEvent: ingest,
+        onEnd: finish,
+        onError: fail,
+      });
+    },
+    [demoType, start, ingest, finish, fail],
+  );
+
+  // Auto-play scripted demos once on load.
+  useEffect(() => {
+    if (!config.interactive) {
+      const t = setTimeout(() => run(), 400);
+      return () => clearTimeout(t);
     }
-  }, [interactive]);
+  }, [config.interactive, run]);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="space-y-6"
-    >
-      {/* Title and Description */}
+    <div className="space-y-5">
       <div>
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">{title}</h1>
-        <p className="text-lg text-gray-600">{description}</p>
+        <h1 className="text-3xl font-bold text-gray-900">{config.title}</h1>
+        <p className="mt-1 text-gray-600">{config.description}</p>
       </div>
 
-      {/* Error Message */}
+      <BackendStatus />
+
       {error && (
-        <div className="bg-red-50 border-2 border-red-200 text-red-800 p-4 rounded-lg">
-          <p className="font-semibold">Error: {error}</p>
+        <div className="rounded-lg border-2 border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {error} — is the backend running on{" "}
+          <code>{process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"}</code>?
         </div>
       )}
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Left: Diagram */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-        >
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Flow Diagram</h2>
-          <DiagramViewer
-            diagramType={demoType}
-            highlightedElements={highlightedElements}
-            isAnimating={isRunning}
-          />
-        </motion.div>
-
-        {/* Right: Execution Flow */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-        >
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Execution Flow</h2>
-          <ExecutionFlow events={executionResults} isExecuting={isRunning} />
-        </motion.div>
-      </div>
-
-      {/* Interactive Controls */}
-      {interactive && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="bg-blue-50 rounded-xl p-6 border-2 border-blue-200"
-        >
-          <h3 className="text-lg font-bold text-gray-900 mb-4">Try It Out</h3>
-
-          <div className="space-y-4">
-            {/* Query Input */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Enter your question:
-              </label>
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="e.g., What is prompt engineering?"
-                className="w-full px-4 py-2 border-2 border-blue-300 rounded-lg focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-                disabled={isRunning}
-              />
-            </div>
-
-            {/* Example Queries */}
-            {exampleQueries.length > 0 && (
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Or try an example:
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {exampleQueries.map((q, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleExecute(q)}
-                      disabled={isRunning}
-                      className="px-3 py-2 text-sm bg-white border border-blue-300 rounded hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition text-left"
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Execute Button */}
-            <div className="flex gap-3">
+      {config.interactive && (
+        <div className="rounded-xl border-2 border-violet-200 bg-violet-50 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && query && !running && run(query)}
+              placeholder="Ask a question about prompt engineering, RAG, or agentic AI…"
+              disabled={running}
+              className="flex-1 rounded-lg border-2 border-violet-300 px-4 py-2 focus:border-violet-600 focus:outline-none"
+            />
+            <button
+              onClick={() => run(query)}
+              disabled={running || !query}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-600 px-5 py-2 font-semibold text-white transition hover:bg-violet-700 disabled:opacity-50"
+            >
+              {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+              {running ? "Running" : "Run"}
+            </button>
+            {steps.length > 0 && !running && (
               <button
-                onClick={() => handleExecute()}
-                disabled={isRunning || !query}
-                className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold rounded-lg hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition"
+                onClick={reset}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-200 px-4 py-2 font-semibold text-gray-700 transition hover:bg-gray-300"
               >
-                {isRunning ? "Executing..." : "Execute"}
+                <RotateCcw className="h-4 w-4" /> Reset
               </button>
-
-              {(executionResults.length > 0 || isRunning) && (
-                <button
-                  onClick={() => {
-                    reset();
-                    setIsRunning(false);
-                  }}
-                  className="px-6 py-3 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300 transition"
-                >
-                  Reset
-                </button>
-              )}
-            </div>
-
-            {isRunning && (
-              <div className="text-center">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  className="inline-block"
-                >
-                  ⚙️
-                </motion.div>
-                <p className="text-sm text-gray-600 mt-2">Processing your query...</p>
-              </div>
             )}
           </div>
-        </motion.div>
+          {examples.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {examples.map((ex) => (
+                <button
+                  key={ex}
+                  onClick={() => {
+                    setQuery(ex);
+                    run(ex);
+                  }}
+                  disabled={running}
+                  className="rounded-full border border-violet-300 bg-white px-3 py-1 text-xs text-violet-700 transition hover:bg-violet-100 disabled:opacity-50"
+                >
+                  {ex}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
-      {/* Auto-play Controls for non-interactive demos */}
-      {!interactive && !isRunning && executionResults.length > 0 && (
-        <motion.button
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          onClick={() => handleExecute()}
-          className="w-full px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition"
+      {!config.interactive && (
+        <button
+          onClick={() => run()}
+          disabled={running}
+          className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-5 py-2 font-semibold text-white transition hover:bg-violet-700 disabled:opacity-50"
         >
-          ▶ Play Again
-        </motion.button>
+          {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+          {running ? "Playing…" : "Replay"}
+        </button>
       )}
-    </motion.div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <h2 className="mb-3 text-lg font-bold text-gray-900">Flow diagram</h2>
+          <DiagramViewer demoType={demoType} highlight={highlight} />
+        </motion.div>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <h2 className="mb-3 text-lg font-bold text-gray-900">Live execution</h2>
+          <ExecutionFlow steps={steps} running={running} />
+        </motion.div>
+      </div>
+    </div>
   );
 }

@@ -1,316 +1,139 @@
-# Agentic RAG Interactive Demo
+# Agentic RAG — Interactive Demo
 
-An interactive WebApp for demonstrating Agentic RAG concepts with real-time execution visualization.
+A presentation-ready web app that demonstrates **RAG** and **Agentic RAG** concepts
+with animated flow diagrams driven by **real, executing code**. Built to let a
+presenter walk an audience through the three flow diagrams in real time: the diagram
+lights up step-by-step in lockstep with the live execution panel beside it.
 
-## 📋 Table of Contents
+Three demos:
 
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Prerequisites](#prerequisites)
-- [Quick Start](#quick-start)
-- [Architecture](#architecture)
-- [Demo Types](#demo-types)
-- [Configuration](#configuration)
-- [Development](#development)
+1. **What is Agentic AI?** — the `PLAN → ACT → OBSERVE → REFLECT` loop and the
+   capabilities behind it (planning, tool use, memory, reflection, autonomy).
+2. **Classic RAG vs Agentic RAG** — a side-by-side walkthrough of why a single-shot
+   pipeline fails where a reasoning loop succeeds.
+3. **Agentic RAG: the reasoning loop** — *interactive and live*. Type a question and
+   watch the agent **plan → retrieve → evaluate → (refine ↺) → generate → verify →
+   answer**, against a real in-process vector search, with the answer streamed token
+   by token.
 
-## ✨ Features
+---
 
-- **Three Interactive Demos**:
-  - 🤖 **What is Agentic AI?** - Animated explanation of agentic AI components and loops
-  - 📊 **RAG Comparison** - Side-by-side comparison of classic RAG vs agentic RAG
-  - ⚡ **Agentic RAG Loop** - Real-time interactive demo with user queries
+## Why it's robust for live demos
 
-- **Real-time Visualization**:
-  - Live flow diagrams with step-by-step highlighting
-  - Execution flow with detailed step information
-  - Code blocks showing actual code at each step
-  - Results and reasoning displayed in real-time
+- **No external infrastructure.** Retrieval is a real in-process TF-IDF vector
+  search (NumPy) — no Docker, no Weaviate, nothing to fall over mid-talk.
+- **Works offline.** With no API key the backend runs in **DEMO mode** and returns
+  deterministic, grounded answers so the whole UI still works on a plane.
+- **Real when you want it.** Set `ANTHROPIC_API_KEY` and the agentic-loop demo runs
+  against live Claude models for planning, evaluation, and answer synthesis.
 
-- **Presentation-Ready**:
-  - Smooth animations and transitions
-  - Clear explanations at each step
-  - Interactive controls for exploration
-  - Professional UI/UX design
+---
 
-## 🛠️ Tech Stack
+## Architecture
 
-### Frontend
-- **Next.js 14** - React framework
-- **React 18** - UI components
-- **TypeScript** - Type safety
-- **Framer Motion** - Animations
-- **Zustand** - State management
-- **Tailwind CSS** - Styling
-- **Excalidraw** - Diagram rendering
-
-### Backend
-- **FastAPI** - Python web framework
-- **Anthropic Claude API** - LLM integration
-- **Weaviate** - Vector database
-- **Pydantic** - Data validation
-- **Server-Sent Events (SSE)** - Real-time streaming
-
-## 📦 Prerequisites
-
-- **Node.js** 18+ (for frontend)
-- **Python** 3.8+ (for backend)
-- **Docker** (optional, for Weaviate)
-- **Anthropic API Key** (get from https://console.anthropic.com)
-
-## 🚀 Quick Start
-
-### 1. Clone the Repository
-
-```bash
-cd /home/user/AgenticRAG
+```
+Browser (Next.js, React, SVG diagrams)
+   │  EventSource GET /demo/stream?demoType=...&query=...   (Server-Sent Events)
+   ▼
+FastAPI backend
+   ├─ DemoOrchestrator        emits diagram-synced steps
+   ├─ InMemoryRetriever       real TF-IDF + cosine vector search (NumPy)
+   └─ ClaudeService           plan / evaluate (structured output) / generate (streamed)
+          │
+          ▼
+   Anthropic Claude API   (only external dependency; optional — DEMO mode if absent)
 ```
 
-### 2. Set Up Environment Variables
+Each streamed step carries `highlight` node IDs that exactly match the IDs in the
+React diagram components, which is what keeps the picture and the code in sync.
+
+**Models** (configurable): `claude-haiku-4-5` for the fast plan/evaluate steps and
+`claude-sonnet-4-6` for answer synthesis — chosen for low latency in a live setting.
+
+---
+
+## Quick start
+
+### 1. Backend (run from the repo root)
 
 ```bash
-# Copy the example env file
-cp .env.example .env
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r backend/requirements.txt
 
-# Edit .env and add your Anthropic API key
-# ANTHROPIC_API_KEY=sk-your-key-here
+# optional: enable live Claude calls
+cp backend/.env.example backend/.env   # then edit ANTHROPIC_API_KEY
+
+uvicorn backend.main:app --reload --port 8000
 ```
 
-### 3. Set Up Weaviate (Docker)
+Backend is at `http://localhost:8000` (`/health`, `/docs`, `/demo/stream`).
 
-```bash
-docker-compose up -d
-# or run Weaviate locally on http://localhost:8080
-```
-
-### 4. Install Backend Dependencies
-
-```bash
-cd backend
-pip install -r requirements.txt
-```
-
-### 5. Start Backend Server
-
-```bash
-cd backend
-python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-
-The backend will be available at `http://localhost:8000`
-
-### 6. Install Frontend Dependencies
+### 2. Frontend
 
 ```bash
 cd frontend
 npm install
-```
-
-### 7. Start Frontend Dev Server
-
-```bash
-cd frontend
 npm run dev
 ```
 
-The frontend will be available at `http://localhost:3000`
+Open `http://localhost:3000`.
 
-### 8. Open in Browser
-
-Visit `http://localhost:3000` to see the demo!
-
-## 🏗️ Architecture
-
-### Frontend Flow
-```
-User Browser
-    ↓
-Next.js Page (React Component)
-    ↓
-Demo Components (DiagramViewer, ExecutionFlow, etc.)
-    ↓
-Zustand Store (State Management)
-    ↓
-SSE EventSource (Real-time Updates)
-    ↓
-Backend API (HTTP)
-```
-
-### Backend Flow
-```
-FastAPI Route Handler
-    ↓
-DemoOrchestrator (Routes to specific demo)
-    ↓
-RAGPipeline / DemoOrchestrator
-    ↓
-Claude Integration (LLM Calls)
-    ↓
-Weaviate Vector Store (Document Retrieval)
-    ↓
-SSE Generator (Stream Results to Frontend)
-```
-
-### Data Flow (Agentic RAG Loop)
-```
-User Query
-    ↓
-PLAN: Rewrite query for better retrieval
-    ↓
-RETRIEVE: Search vector database
-    ↓
-EVALUATE: Assess document relevance (0-1 score)
-    ↓
-if score < 0.7:
-    REFINE: Loop back to PLAN with feedback
-else:
-    GENERATE: Create answer from context
-    ↓
-    COMPLETE: Return final answer with citations
-```
-
-## 📱 Demo Types
-
-### 1. What is Agentic AI? (`what-is-ai`)
-- **Type**: Auto-play animation
-- **Duration**: 2-3 minutes
-- **Interactive**: No
-- **Features**:
-  - Animated flow showing PLAN → ACT → OBSERVE → REFLECT loop
-  - Explains each component of agentic systems
-  - Code pseudocode at each step
-  - No LLM calls (purely demonstrative)
-
-### 2. Classic RAG vs Agentic RAG (`rag-comparison`)
-- **Type**: Auto-play animation
-- **Duration**: 1-2 minutes
-- **Interactive**: No
-- **Features**:
-  - Side-by-side flow comparison
-  - Shows why agentic RAG is better
-  - Highlights refinement loop advantage
-  - Synchronized highlighting between left/right
-
-### 3. Agentic RAG Reasoning Loop (`agentic-loop`)
-- **Type**: Interactive demo
-- **Duration**: 30-90 seconds per query
-- **Interactive**: Yes
-- **Features**:
-  - User can input custom queries
-  - Pre-loaded example queries
-  - Real LLM calls (Claude API)
-  - Real vector database retrieval (Weaviate)
-  - Shows actual evaluation scores
-  - Demonstrates looping behavior when score is low
-
-## ⚙️ Configuration
-
-### Backend Configuration (backend/.env)
-```
-ANTHROPIC_API_KEY=sk-...              # Claude API key
-ANTHROPIC_MODEL=claude-3-5-sonnet-... # Model to use
-WEAVIATE_URL=http://localhost:8080    # Weaviate URL
-WEAVIATE_API_KEY=...                  # (Optional) if using cloud
-DEMO_MAX_ITERATIONS=5                 # Max refinement loops
-DEMO_EVALUATION_THRESHOLD=0.7         # Confidence threshold
-```
-
-### Frontend Configuration (frontend/.env.local)
-```
-NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
-```
-
-## 📚 Demo Data
-
-The demo comes pre-loaded with 10 sample documents about:
-- Prompt Engineering (2 docs)
-- Retrieval-Augmented Generation (2 docs)
-- Agentic AI Systems (6 docs)
-
-Documents are automatically seeded into Weaviate on first run.
-
-## 🔧 Development
-
-### Running Tests
-
-```bash
-# Backend (from backend/)
-pytest
-
-# Frontend (from frontend/)
-npm run test
-```
-
-### Building for Production
-
-```bash
-# Backend
-cd backend
-# Deploy with: gunicorn main:app
-
-# Frontend
-cd frontend
-npm run build
-npm start
-# or deploy to Vercel: vercel deploy
-```
-
-### Project Structure
-
-```
-AgenticRAG/
-├── frontend/                # Next.js application
-│   ├── app/                # Pages and layouts
-│   ├── components/         # React components
-│   ├── hooks/              # Custom hooks
-│   ├── lib/                # Utilities and constants
-│   ├── public/diagrams/    # Excalidraw diagram files
-│   └── styles/             # Global CSS
-│
-├── backend/                # FastAPI application
-│   ├── models/            # Pydantic schemas
-│   ├── routers/           # API endpoints
-│   ├── services/          # Business logic
-│   ├── main.py            # FastAPI app
-│   ├── config.py          # Configuration
-│   └── requirements.txt    # Python dependencies
-│
-├── .env.example            # Environment template
-├── .gitignore
-└── README.md
-```
-
-## 🎨 Customization
-
-### Adding Custom Diagrams
-
-1. Create diagrams in Excalidraw
-2. Export as JSON
-3. Save to `frontend/public/diagrams/`
-4. Reference in demo components
-
-### Adding Custom Documents
-
-Edit `backend/models/demo_data.py` and add documents to `DEMO_DOCUMENTS` dict.
-
-### Changing Styling
-
-Edit `frontend/tailwind.config.js` and `frontend/styles/globals.css`
-
-## 📝 License
-
-MIT License - feel free to use this for presentations and learning!
-
-## 🤝 Contributing
-
-Feel free to submit issues and enhancement requests!
-
-## 📞 Support
-
-For issues with:
-- **Frontend**: Check Next.js and React documentation
-- **Backend**: Check FastAPI and Anthropic SDK documentation
-- **Vector DB**: Check Weaviate documentation
+> If the backend runs somewhere other than `http://localhost:8000`, set
+> `NEXT_PUBLIC_BACKEND_URL` (see `frontend/.env.local.example`).
 
 ---
 
-**Built with ❤️ for understanding Agentic RAG concepts**
+## Tests
+
+```bash
+source .venv/bin/activate
+pytest                 # backend: retrieval relevance + full loop in DEMO mode
+
+cd frontend
+npm run typecheck      # frontend types
+npm run build          # production build
+```
+
+---
+
+## Project layout
+
+```
+backend/
+  main.py                     FastAPI app (run as backend.main:app)
+  config.py                   settings + DEMO-mode detection
+  models/
+    schemas.py                request + streamed-event models
+    demo_data.py              the demo knowledge base + example queries
+  services/
+    retrieval.py              real in-process TF-IDF vector search
+    claude_integration.py     async Claude: plan / evaluate / generate (streamed)
+    demo_orchestrator.py      drives all three demos, emits diagram-synced events
+  routers/
+    demo.py                   GET /demo/stream (SSE), /demo/examples
+    health.py                 GET /health
+  tests/                      retrieval + orchestrator tests
+
+frontend/
+  app/                        Next.js app router (home + /demo/[type])
+  components/
+    DemoLayout.tsx            orchestrates a demo: input, stream, diagram + flow
+    DiagramViewer.tsx         dispatches to the right diagram
+    diagrams/                 animated SVG diagrams (node IDs match backend)
+    ExecutionFlow.tsx         live step list
+    DemoStep.tsx              one step (code, docs, score, streamed answer)
+    BackendStatus.tsx         online / DEMO-vs-LIVE banner
+  hooks/useDemo.ts            Zustand store (merges streamed answer deltas)
+  lib/api-client.ts           EventSource SSE client + health/examples
+
+public/diagrams/              the original Excalidraw source diagrams (design reference)
+```
+
+---
+
+## Swapping in a production vector store
+
+`backend/services/retrieval.py` exposes a single `retrieve(query, top_k)` method.
+To move from the in-process index to a managed vector database (Weaviate, Pinecone,
+pgvector, …), implement that one method against your store and keep the rest of the
+pipeline unchanged.

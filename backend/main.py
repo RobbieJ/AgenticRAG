@@ -1,57 +1,44 @@
+"""FastAPI application entrypoint.
+
+Run from the repository root:
+    uvicorn backend.main:app --reload --port 8000
+"""
+
+from __future__ import annotations
+
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+
 from backend.config import settings
 from backend.routers import demo, health
 
-__version__ = "1.0.0"
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("agentic_rag")
 
-app = FastAPI(
-    title=settings.API_TITLE,
-    version=__version__,
-    description="Interactive WebApp for demonstrating Agentic RAG concepts",
-)
+app = FastAPI(title=settings.api_title, version=settings.api_version)
 
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
-@app.get("/")
-async def root():
-    """Root endpoint."""
-    return {
-        "message": "Agentic RAG Demo API",
-        "version": __version__,
-        "docs": "/docs",
-    }
-
-
-# Include routers
 app.include_router(health.router)
 app.include_router(demo.router)
 
 
-@app.exception_handler(Exception)
-async def general_exception_handler(request, exc):
-    """Handle general exceptions."""
-    return JSONResponse(
-        status_code=500,
-        content={"detail": str(exc)},
-    )
+@app.on_event("startup")
+async def _startup() -> None:
+    mode = "DEMO (no API key — deterministic offline answers)" if settings.demo_mode else "LIVE"
+    logger.info("Agentic RAG API starting in %s mode", mode)
+    if not settings.demo_mode:
+        logger.info("Models: answer=%s fast=%s", settings.answer_model, settings.fast_model)
 
 
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=settings.DEBUG,
-    )
+@app.get("/")
+async def root() -> dict:
+    return {"name": settings.api_title, "version": settings.api_version, "docs": "/docs"}

@@ -2,81 +2,53 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Brain, Zap, BarChart3 } from "lucide-react";
+import { ArrowRight, Brain, GitCompare, Repeat } from "lucide-react";
+import { DEMO_CONFIGS, DEMO_ORDER } from "@/lib/demo-constants";
+import { DemoType } from "@/lib/types";
+import { BackendStatus } from "./BackendStatus";
 
-const demos = [
-  {
-    id: "what-is-ai",
-    title: "What is Agentic AI?",
-    description:
-      "Understand the key components of agentic AI systems and how the PLAN→ACT→OBSERVE→REFLECT loop works.",
-    icon: Brain,
-    color: "from-purple-500 to-purple-600",
-    duration: "~2-3 minutes",
-  },
-  {
-    id: "rag-comparison",
-    title: "Classic RAG vs Agentic RAG",
-    description:
-      "See the differences between traditional RAG and agentic RAG side-by-side. Understand why agentic RAG is more powerful.",
-    icon: BarChart3,
-    color: "from-blue-500 to-blue-600",
-    duration: "~1-2 minutes",
-  },
-  {
-    id: "agentic-loop",
-    title: "Agentic RAG Reasoning Loop",
-    description:
-      "Watch the agentic RAG system execute in real-time. Enter a query and see it plan, retrieve, evaluate, generate, and refine.",
-    icon: Zap,
-    color: "from-green-500 to-green-600",
-    duration: "Variable",
-  },
-];
+const META: Record<DemoType, { icon: typeof Brain; gradient: string }> = {
+  "what-is-ai": { icon: Brain, gradient: "from-purple-500 to-violet-600" },
+  "rag-comparison": { icon: GitCompare, gradient: "from-sky-500 to-blue-600" },
+  "agentic-loop": { icon: Repeat, gradient: "from-emerald-500 to-green-600" },
+};
 
 export function DemoSelector() {
   return (
     <div className="space-y-8">
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="text-center"
-      >
-        <h2 className="text-4xl font-bold text-gray-900 mb-4">Choose a Demo</h2>
-        <p className="text-xl text-gray-600">
-          Explore interactive demonstrations of RAG and Agentic AI concepts
+      <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="text-center">
+        <h2 className="text-4xl font-bold text-gray-900">Choose a demo</h2>
+        <p className="mt-3 text-lg text-gray-600">
+          Three interactive walkthroughs of RAG and Agentic AI — diagrams animate in
+          lockstep with live, executing code.
         </p>
       </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {demos.map((demo, index) => {
-          const Icon = demo.icon;
+      <BackendStatus />
+
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        {DEMO_ORDER.map((type, i) => {
+          const config = DEMO_CONFIGS[type];
+          const { icon: Icon, gradient } = META[type];
           return (
             <motion.div
-              key={demo.id}
-              initial={{ opacity: 0, y: 20 }}
+              key={type}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              whileHover={{ y: -8 }}
+              transition={{ delay: i * 0.08 }}
+              whileHover={{ y: -6 }}
             >
-              <Link href={`/demo/${demo.id}`}>
-                <div className="h-full rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow cursor-pointer bg-white">
-                  <div
-                    className={`bg-gradient-to-r ${demo.color} p-8 text-white flex items-center justify-center min-h-32`}
-                  >
-                    <Icon size={56} />
+              <Link href={`/demo/${type}`}>
+                <div className="flex h-full cursor-pointer flex-col overflow-hidden rounded-xl bg-white shadow-lg transition hover:shadow-2xl">
+                  <div className={`flex min-h-28 items-center justify-center bg-gradient-to-r ${gradient} text-white`}>
+                    <Icon size={52} />
                   </div>
-
-                  <div className="p-6">
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">{demo.title}</h3>
-                    <p className="text-gray-600 text-sm mb-4">{demo.description}</p>
-
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                      <span className="text-xs text-gray-500 font-semibold">
-                        ⏱️ {demo.duration}
-                      </span>
-                      <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-blue-500 transition" />
+                  <div className="flex flex-1 flex-col p-5">
+                    <h3 className="text-lg font-bold text-gray-900">{config.title}</h3>
+                    <p className="mt-2 flex-1 text-sm text-gray-600">{config.description}</p>
+                    <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-3">
+                      <span className="text-xs font-medium text-gray-500">{config.duration}</span>
+                      <ArrowRight className="h-5 w-5 text-gray-400" />
                     </div>
                   </div>
                 </div>
@@ -85,20 +57,6 @@ export function DemoSelector() {
           );
         })}
       </div>
-
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.6, delay: 0.3 }}
-        className="bg-blue-50 rounded-xl p-8 border-2 border-blue-200"
-      >
-        <h3 className="font-bold text-blue-900 mb-3">💡 About These Demos</h3>
-        <p className="text-blue-800 text-sm leading-relaxed">
-          These interactive demonstrations show how Agentic AI systems work in practice.
-          Watch real-time execution with visual flow diagrams and code blocks. Perfect for
-          presentations and understanding the concepts behind modern AI systems.
-        </p>
-      </motion.div>
     </div>
   );
 }

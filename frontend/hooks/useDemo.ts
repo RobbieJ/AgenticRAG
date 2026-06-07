@@ -1,52 +1,56 @@
 "use client";
 
 import { create } from "zustand";
-import { DemoStore, DemoEvent, DemoType } from "@/lib/types";
+import { DemoEvent, DemoStepData } from "@/lib/types";
 
-export const useDemo = create<DemoStore>((set) => ({
-  currentStep: 0,
-  highlightedElements: [],
-  codeBlocks: [],
-  executionResults: [],
-  isExecuting: false,
-  demoType: "what-is-ai",
-  query: undefined,
+interface DemoState {
+  steps: DemoStepData[];
+  highlight: string[];
+  running: boolean;
+  error: string | null;
 
-  updateStep: (event: DemoEvent) =>
-    set((state) => ({
-      currentStep: event.step,
-      highlightedElements: event.highlightDiagram || [],
-      codeBlocks: event.codeBlock
-        ? [...state.codeBlocks, event.codeBlock]
-        : state.codeBlocks,
-      executionResults: [...state.executionResults, event],
-    })),
+  start: () => void;
+  ingest: (event: DemoEvent) => void;
+  finish: () => void;
+  fail: (message: string) => void;
+  reset: () => void;
+}
 
-  reset: () =>
-    set({
-      currentStep: 0,
-      highlightedElements: [],
-      codeBlocks: [],
-      executionResults: [],
-      isExecuting: false,
+export const useDemo = create<DemoState>((set) => ({
+  steps: [],
+  highlight: [],
+  running: false,
+  error: null,
+
+  start: () => set({ steps: [], highlight: [], running: true, error: null }),
+
+  ingest: (event) =>
+    set((state) => {
+      const highlight = event.highlight?.length ? event.highlight : state.highlight;
+
+      // Streamed answer deltas merge into the matching step rather than
+      // creating new steps.
+      if (event.answer_delta) {
+        const steps = state.steps.map((s) =>
+          s.step === event.step
+            ? { ...s, answer: (s.answer ?? "") + event.answer_delta }
+            : s,
+        );
+        return { steps, highlight };
+      }
+
+      // Replace an existing step with the same number (e.g. GENERATE finalize),
+      // otherwise append.
+      const idx = state.steps.findIndex((s) => s.step === event.step);
+      if (idx >= 0) {
+        const steps = [...state.steps];
+        steps[idx] = { ...steps[idx], ...event };
+        return { steps, highlight };
+      }
+      return { steps: [...state.steps, event], highlight };
     }),
 
-  setDemoType: (type: DemoType) =>
-    set({
-      demoType: type,
-      currentStep: 0,
-      highlightedElements: [],
-      codeBlocks: [],
-      executionResults: [],
-      isExecuting: false,
-    }),
-
-  setQuery: (query: string) =>
-    set({
-      query,
-      currentStep: 0,
-      highlightedElements: [],
-      codeBlocks: [],
-      executionResults: [],
-    }),
+  finish: () => set({ running: false }),
+  fail: (message) => set({ running: false, error: message }),
+  reset: () => set({ steps: [], highlight: [], running: false, error: null }),
 }));

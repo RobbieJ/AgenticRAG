@@ -1,197 +1,199 @@
+"""Drives the three demos and emits diagram-synced events.
+
+Each ``DemoEvent`` carries ``highlight`` node IDs that exactly match the IDs used
+by the React diagram components, so the on-screen flow diagram animates in lockstep
+with the executing code.
+
+  - what-is-ai     : scripted PLAN -> ACT -> OBSERVE -> REFLECT loop (no LLM)
+  - rag-comparison : scripted classic vs agentic walkthrough (no LLM)
+  - agentic-loop   : the real loop — retrieve + Claude plan/evaluate/generate
+"""
+
+from __future__ import annotations
+
 import asyncio
-from typing import AsyncGenerator
-from backend.models.schemas import DemoEvent, DemoTypeEnum
-from backend.services.rag_pipeline import RAGPipeline
-from backend.services.claude_integration import ClaudeIntegration
+from typing import AsyncGenerator, Optional
+
+from backend.config import settings
+from backend.models.schemas import DemoEvent, DemoType
+from backend.services.claude_integration import ClaudeService
+from backend.services.retrieval import retriever
+
+# Pacing between scripted steps so a presenter can narrate.
+STEP_PAUSE = 1.4
 
 
 class DemoOrchestrator:
-    def __init__(self):
-        self.rag_pipeline = RAGPipeline()
-        self.claude = ClaudeIntegration()
+    def __init__(self) -> None:
+        self.claude = ClaudeService()
 
-    async def execute_demo(
-        self, demo_type: DemoTypeEnum, query: str = None
+    async def run(
+        self, demo_type: DemoType, query: Optional[str] = None
     ) -> AsyncGenerator[DemoEvent, None]:
-        """Execute the appropriate demo based on type."""
-        if demo_type == DemoTypeEnum.WHAT_IS_AI:
-            async for event in self._demo_what_is_ai():
-                yield event
-        elif demo_type == DemoTypeEnum.RAG_COMPARISON:
-            async for event in self._demo_rag_comparison():
-                yield event
-        elif demo_type == DemoTypeEnum.AGENTIC_LOOP:
-            if not query:
-                query = "What is prompt engineering?"
-            async for event in self.rag_pipeline.execute_agentic_rag(query):
-                yield event
+        if demo_type == DemoType.WHAT_IS_AI:
+            async for ev in self._what_is_ai():
+                yield ev
+        elif demo_type == DemoType.RAG_COMPARISON:
+            async for ev in self._rag_comparison():
+                yield ev
+        else:
+            async for ev in self._agentic_loop(query or "What is agentic RAG?"):
+                yield ev
 
-    async def _demo_what_is_ai(self) -> AsyncGenerator[DemoEvent, None]:
-        """Demo: What is Agentic AI - shows the loop components."""
+    # ----------------------------------------------------------- DEMO 1
+    async def _what_is_ai(self) -> AsyncGenerator[DemoEvent, None]:
         steps = [
-            (
-                1,
-                "PLAN",
-                "Analyzing the task and planning the approach",
-                "def plan(goal):\n    return break_into_steps(goal)",
-                ["planning_box"],
-            ),
-            (
-                2,
-                "ACT",
-                "Executing actions based on the plan",
-                "def act(step):\n    return execute_tool(step)",
-                ["act_box", "tool_use_box"],
-            ),
-            (
-                3,
-                "OBSERVE",
-                "Observing the results and environment feedback",
-                "def observe():\n    return check_results()",
-                ["observe_box", "memory_box"],
-            ),
-            (
-                4,
-                "REFLECT",
-                "Reflecting on outcomes and self-correcting",
-                "def reflect(result):\n    return evaluate_quality(result)",
-                ["reflect_box"],
-            ),
+            ("PLAN", "Plan", "Break the ambiguous goal into concrete steps.",
+             "plan = agent.decompose(goal)", ["agent", "planning", "plan"]),
+            ("ACT", "Act", "Take an action using a tool.",
+             "result = agent.use_tool(step)", ["agent", "tooluse", "act"]),
+            ("OBSERVE", "Observe", "Observe the result and update memory.",
+             "memory.record(result)", ["agent", "memory", "observe"]),
+            ("REFLECT", "Reflect", "Critique the outcome and decide whether to continue.",
+             "if not agent.satisfied(): continue", ["agent", "reflection", "reflect"]),
         ]
+        for i, (phase, title, desc, code, highlight) in enumerate(steps, start=1):
+            yield DemoEvent(step=i, phase=phase, title=title, description=desc,
+                            code=code, highlight=highlight)
+            await asyncio.sleep(STEP_PAUSE)
 
-        for step_num, name, desc, code, highlights in steps:
-            yield DemoEvent(
-                step=step_num,
-                name=name,
-                description=desc,
-                codeBlock=code,
-                highlightDiagram=highlights,
-                executionTime=1.5,
-            )
-            await asyncio.sleep(2)
-
-        # Show the loop
         yield DemoEvent(
-            step=5,
-            name="LOOP",
-            description="The agentic loop continues until the goal is achieved",
-            codeBlock="while not goal_achieved():\n    plan() → act() → observe() → reflect()",
-            highlightDiagram=["planning_box", "act_box", "observe_box", "reflect_box"],
-            executionTime=1.0,
+            step=5, phase="LOOP", title="The agentic loop",
+            description="Autonomy ties it together: the agent repeats plan -> act -> observe -> reflect until confident.",
+            code="while not goal_achieved():\n    plan(); act(); observe(); reflect()",
+            highlight=["agent", "autonomy", "plan", "act", "observe", "reflect"],
+            done=True,
         )
 
-    async def _demo_rag_comparison(self) -> AsyncGenerator[DemoEvent, None]:
-        """Demo: Classic RAG vs Agentic RAG - shows the differences."""
-        # Classic RAG side
-        classic_steps = [
-            (
-                1,
-                "CLASSIC_QUERY",
-                "Classic RAG: User enters query",
-                "query = user_input()",
-                ["classic_query_box"],
-            ),
-            (
-                2,
-                "CLASSIC_RETRIEVE",
-                "Classic RAG: Single retrieval pass",
-                "docs = vector_db.search(query)",
-                ["classic_retrieve_box"],
-            ),
-            (
-                3,
-                "CLASSIC_GENERATE",
-                "Classic RAG: Generate answer",
-                "answer = llm.generate(docs, query)",
-                ["classic_generate_box"],
-            ),
+    # ----------------------------------------------------------- DEMO 2
+    async def _rag_comparison(self) -> AsyncGenerator[DemoEvent, None]:
+        classic = [
+            ("Query", "User asks a question.", "query = user_input()", ["c_query"]),
+            ("Embed", "Embed the query into a vector.", "v = embed(query)", ["c_embed"]),
+            ("Search (once)", "Single vector-search pass — no retry.",
+             "chunks = index.search(v, k=4)", ["c_search"]),
+            ("Top-k chunks", "Whatever came back is all the context there is.",
+             "context = chunks", ["c_chunks"]),
+            ("Generate", "Generate an answer from that single context.",
+             "answer = llm(context, query)", ["c_generate"]),
+            ("Answer", "Return the answer. If retrieval missed, so does the answer.",
+             "return answer", ["c_answer"]),
         ]
+        for i, (title, desc, code, highlight) in enumerate(classic, start=1):
+            yield DemoEvent(step=i, phase="CLASSIC", title=f"Classic RAG · {title}",
+                            description=desc, code=code, highlight=highlight)
+            await asyncio.sleep(STEP_PAUSE)
 
-        for step_num, name, desc, code, highlights in classic_steps:
-            yield DemoEvent(
-                step=step_num,
-                name=name,
-                description=desc,
-                codeBlock=code,
-                highlightDiagram=highlights,
-                executionTime=1.2,
-            )
-            await asyncio.sleep(2)
+        agentic = [
+            ("Query", "User asks a question.", "query = user_input()", ["a_query"]),
+            ("Plan", "The agent plans an approach and rewrites the query.",
+             "plan = agent.plan(query)", ["a_plan"]),
+            ("Retrieve", "Retrieve from a chosen tool/source.",
+             "docs = agent.retrieve(plan)", ["a_retrieve", "a_tools"]),
+            ("Evaluate -> decide", "Is the evidence enough? Retrieve again or proceed.",
+             "if score < 0.7: retrieve_again()", ["a_decision"]),
+            ("Generate + verify", "Synthesize a grounded answer and verify it.",
+             "answer = agent.generate(docs)", ["a_generate"]),
+            ("Answer + citations", "Self-correcting, not one-shot.",
+             "return answer, citations", ["a_answer"]),
+        ]
+        for j, (title, desc, code, highlight) in enumerate(agentic, start=7):
+            yield DemoEvent(step=j, phase="AGENTIC", title=f"Agentic RAG · {title}",
+                            description=desc, code=code, highlight=highlight)
+            await asyncio.sleep(STEP_PAUSE)
 
-        # Comparison
         yield DemoEvent(
-            step=4,
-            name="COMPARISON",
-            description="Classic RAG retrieves once. If it misses, there's no recovery.",
-            codeBlock="# No refinement or loop\nreturn answer",
-            highlightDiagram=[],
-            executionTime=1.0,
+            step=13, phase="SUMMARY", title="Why agentic RAG wins",
+            description="Classic RAG retrieves once and hopes. Agentic RAG evaluates its "
+                        "evidence and retries until confident — robust on hard questions.",
+            highlight=["a_decision"], done=True,
         )
-        await asyncio.sleep(2)
 
-        # Agentic RAG side
-        agentic_steps = [
-            (
-                5,
-                "AGENTIC_QUERY",
-                "Agentic RAG: User enters query",
-                "query = user_input()",
-                ["agentic_query_box"],
-            ),
-            (
-                6,
-                "AGENTIC_PLAN",
-                "Agentic RAG: Plan the retrieval strategy",
-                "plan = llm.plan_retrieval(query)",
-                ["agentic_plan_box"],
-            ),
-            (
-                7,
-                "AGENTIC_RETRIEVE",
-                "Agentic RAG: Retrieve based on plan",
-                "docs = vector_db.search(rewritten_query)",
-                ["agentic_retrieve_box"],
-            ),
-            (
-                8,
-                "AGENTIC_EVALUATE",
-                "Agentic RAG: Evaluate retrieved documents",
-                "score = llm.evaluate(docs, query)",
-                ["agentic_evaluate_box"],
-            ),
-            (
-                9,
-                "AGENTIC_DECISION",
-                "Agentic RAG: Decide - retrieve more or generate?",
-                "if score < threshold: retrieve_again()\nelse: generate()",
-                ["agentic_evaluate_box"],
-            ),
-            (
-                10,
-                "AGENTIC_GENERATE",
-                "Agentic RAG: Generate final answer",
-                "answer = llm.generate(docs, query)",
-                ["agentic_generate_box"],
-            ),
-        ]
+    # ----------------------------------------------------------- DEMO 3 (real)
+    async def _agentic_loop(self, query: str) -> AsyncGenerator[DemoEvent, None]:
+        step = 0
+        feedback: Optional[str] = None
+        documents: list = []
 
-        for step_num, name, desc, code, highlights in agentic_steps:
+        yield DemoEvent(step=(step := step + 1), phase="QUERY", title="User query",
+                        description=query, highlight=["query"])
+        await asyncio.sleep(0.6)
+
+        for iteration in range(1, settings.max_iterations + 1):
+            # PLAN
+            rewritten = await self.claude.plan(query, feedback)
             yield DemoEvent(
-                step=step_num,
-                name=name,
-                description=desc,
-                codeBlock=code,
-                highlightDiagram=highlights,
-                executionTime=1.2,
+                step=(step := step + 1), phase="PLAN", title="Plan",
+                description=f"Rewrote the query for retrieval: “{rewritten}”",
+                code=f'rewritten = claude.plan(query{", feedback" if feedback else ""})',
+                highlight=["plan"], iteration=iteration,
             )
-            await asyncio.sleep(2)
+            await asyncio.sleep(0.5)
 
-        # Final comparison
+            # RETRIEVE
+            documents = retriever.retrieve(rewritten, top_k=settings.retrieval_top_k)
+            yield DemoEvent(
+                step=(step := step + 1), phase="RETRIEVE", title="Retrieve",
+                description=f"Vector search returned {len(documents)} documents.",
+                code="docs = retriever.retrieve(rewritten, top_k=4)",
+                highlight=["retrieve", "tools"],
+                documents=[{"id": d["id"], "title": d["title"], "score": d["score"]} for d in documents],
+                iteration=iteration,
+            )
+            await asyncio.sleep(0.5)
+
+            # EVALUATE
+            verdict = await self.claude.evaluate(query, documents)
+            yield DemoEvent(
+                step=(step := step + 1), phase="EVALUATE", title="Evaluate",
+                description="Is the evidence relevant and sufficient?",
+                code="verdict = claude.evaluate(query, docs)",
+                highlight=["evaluate"], score=verdict["score"],
+                reasoning=verdict["reasoning"], iteration=iteration,
+            )
+            await asyncio.sleep(0.5)
+
+            if verdict["sufficient"] or iteration == settings.max_iterations:
+                break
+
+            # REFINE -> loop
+            feedback = verdict["reasoning"]
+            yield DemoEvent(
+                step=(step := step + 1), phase="REFINE", title="Refine",
+                description=f"Confidence {verdict['score']:.2f} < {settings.evaluation_threshold}. "
+                            f"Refining the query and retrieving again.",
+                code="feedback = verdict.reasoning  # loop back to PLAN",
+                highlight=["refine"], iteration=iteration,
+            )
+            await asyncio.sleep(0.6)
+
+        # GENERATE (streamed)
+        gen_step = (step := step + 1)
         yield DemoEvent(
-            step=11,
-            name="ADVANTAGE",
-            description="Agentic RAG adapts and refines until confident. Self-correcting!",
-            codeBlock="# Evaluates quality and loops if needed\nfor i in range(max_iterations):\n    retrieve() → evaluate() → if confident: break",
-            highlightDiagram=[],
-            executionTime=1.0,
+            step=gen_step, phase="GENERATE", title="Generate",
+            description="Synthesizing a grounded answer from the evidence.",
+            code="for chunk in claude.generate(query, docs): ...",
+            highlight=["generate"], answer="",
+        )
+        full = ""
+        async for chunk in self.claude.generate(query, documents):
+            full += chunk
+            yield DemoEvent(step=gen_step, phase="GENERATE", title="Generate",
+                            highlight=["generate"], answer_delta=chunk)
+
+        # VERIFY
+        yield DemoEvent(
+            step=(step := step + 1), phase="VERIFY", title="Verify",
+            description="Answer checked against retrieved evidence before returning.",
+            code="assert grounded_in(answer, docs)", highlight=["verify"],
+        )
+        await asyncio.sleep(0.5)
+
+        # COMPLETE
+        yield DemoEvent(
+            step=(step := step + 1), phase="COMPLETE", title="Answer + citations",
+            description="High confidence with citations — loop stops.",
+            highlight=["answer"], answer=full,
+            documents=[{"id": d["id"], "title": d["title"], "score": d["score"]} for d in documents],
+            done=True,
         )

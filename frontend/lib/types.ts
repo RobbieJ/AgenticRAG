@@ -23,6 +23,7 @@ export interface DemoStepData extends DemoEvent {}
 export interface Health {
   status: string;
   version: string;
+  provider: string;
   demo_mode: boolean;
   answer_model: string;
   fast_model: string;

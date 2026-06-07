@@ -27,13 +27,19 @@ export function BackendStatus() {
       <span className="flex items-center gap-1">
         <span className="h-2 w-2 rounded-full bg-green-500" /> Backend online
       </span>
+      <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-700">
+        provider: {health.provider}
+      </span>
       {health.demo_mode ? (
         <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800">
-          DEMO mode — deterministic offline answers (set ANTHROPIC_API_KEY for live Claude)
+          DEMO mode — deterministic offline answers (add credentials for the {health.provider} provider to go live)
         </span>
       ) : (
         <span className="rounded-full bg-green-100 px-2 py-0.5 font-medium text-green-800">
-          LIVE — {health.answer_model} · {health.fast_model}
+          LIVE — {health.answer_model}
+          {health.fast_model && health.fast_model !== health.answer_model
+            ? ` · ${health.fast_model}`
+            : ""}
         </span>
       )}
     </div>

@@ -1,17 +1,23 @@
 """Application configuration.
 
-Settings load from environment variables and an optional ``.env`` file. The app
-is designed to run with zero external infrastructure: retrieval is in-process and
-the only external dependency is the Anthropic API. When no API key is present the
-app starts in DEMO mode and serves deterministic, illustrative responses so a
-presenter can still drive the full UI offline.
+Supports three LLM backends, selected by ``LLM_PROVIDER``:
+
+  - ``anthropic`` : Claude via the Anthropic SDK
+  - ``openai``    : OpenAI (or any OpenAI-compatible hosted API)
+  - ``vllm``      : a locally hosted model served by vLLM's OpenAI-compatible API
+
+Retrieval is always in-process (no external vector DB). When the selected
+provider has no credentials configured, the app runs in DEMO mode and serves
+deterministic, offline answers so a presenter can still drive the full UI.
 """
 
 from __future__ import annotations
 
-from typing import List
+from typing import List, Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+Provider = Literal["anthropic", "openai", "vllm"]
 
 
 class Settings(BaseSettings):
@@ -24,12 +30,25 @@ class Settings(BaseSettings):
     api_version: str = "1.0.0"
     debug: bool = False
 
+    # --- Which LLM backend to use ---
+    llm_provider: Provider = "anthropic"
+
     # --- Anthropic ---
-    # Empty key => DEMO mode (no network calls; deterministic sample output).
     anthropic_api_key: str = ""
-    # Small/fast model for plan + evaluate steps; capable model for synthesis.
-    fast_model: str = "claude-haiku-4-5"
-    answer_model: str = "claude-sonnet-4-6"
+    anthropic_fast_model: str = "claude-haiku-4-5"
+    anthropic_answer_model: str = "claude-sonnet-4-6"
+
+    # --- OpenAI (and OpenAI-compatible hosted APIs) ---
+    openai_api_key: str = ""
+    openai_base_url: str = "https://api.openai.com/v1"
+    openai_fast_model: str = "gpt-4o-mini"
+    openai_answer_model: str = "gpt-4o"
+
+    # --- vLLM (local, OpenAI-compatible server) ---
+    # Default port is 8001 to avoid colliding with this backend on 8000.
+    vllm_base_url: str = "http://localhost:8001/v1"
+    vllm_api_key: str = "EMPTY"  # vLLM ignores the key unless configured otherwise
+    vllm_model: str = ""  # must match the model name vLLM was started with
 
     # --- Agentic loop tuning ---
     max_iterations: int = 3
@@ -44,8 +63,30 @@ class Settings(BaseSettings):
 
     @property
     def demo_mode(self) -> bool:
-        """True when no Anthropic key is configured (offline-safe fallback)."""
-        return not self.anthropic_api_key.strip()
+        """True when the selected provider lacks the config needed to run live."""
+        if self.llm_provider == "anthropic":
+            return not self.anthropic_api_key.strip()
+        if self.llm_provider == "openai":
+            return not self.openai_api_key.strip()
+        if self.llm_provider == "vllm":
+            return not (self.vllm_base_url.strip() and self.vllm_model.strip())
+        return True
+
+    @property
+    def fast_model(self) -> str:
+        return {
+            "anthropic": self.anthropic_fast_model,
+            "openai": self.openai_fast_model,
+            "vllm": self.vllm_model,
+        }[self.llm_provider]
+
+    @property
+    def answer_model(self) -> str:
+        return {
+            "anthropic": self.anthropic_answer_model,
+            "openai": self.openai_answer_model,
+            "vllm": self.vllm_model,
+        }[self.llm_provider]
 
 
 settings = Settings()

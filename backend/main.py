@@ -21,8 +21,8 @@ logger = logging.getLogger("agentic_rag")
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    mode = "DEMO (no API key — deterministic offline answers)" if settings.demo_mode else "LIVE"
-    logger.info("Agentic RAG API starting in %s mode", mode)
+    mode = "DEMO (no credentials — deterministic offline answers)" if settings.demo_mode else "LIVE"
+    logger.info("Agentic RAG API starting in %s mode · provider=%s", mode, settings.llm_provider)
     if not settings.demo_mode:
         logger.info("Models: answer=%s fast=%s", settings.answer_model, settings.fast_model)
     yield

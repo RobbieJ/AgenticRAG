@@ -22,10 +22,43 @@ Three demos:
 
 - **No external infrastructure.** Retrieval is a real in-process TF-IDF vector
   search (NumPy) — no Docker, no Weaviate, nothing to fall over mid-talk.
-- **Works offline.** With no API key the backend runs in **DEMO mode** and returns
-  deterministic, grounded answers so the whole UI still works on a plane.
-- **Real when you want it.** Set `ANTHROPIC_API_KEY` and the agentic-loop demo runs
-  against live Claude models for planning, evaluation, and answer synthesis.
+- **Works offline.** With no credentials the backend runs in **DEMO mode** and
+  returns deterministic, grounded answers so the whole UI still works on a plane.
+- **Bring your own LLM.** The agentic-loop demo runs live against any of three
+  providers — **Anthropic Claude**, **OpenAI**, or a **local vLLM** model — chosen
+  with a single `LLM_PROVIDER` setting.
+
+## LLM providers
+
+Pick one via `LLM_PROVIDER` in `backend/.env`. Each provider implements the same
+`plan / evaluate / generate` interface (`backend/services/llm/`), so the agentic
+loop is identical regardless of backend.
+
+| `LLM_PROVIDER` | Needs | Notes |
+|----------------|-------|-------|
+| `anthropic` | `ANTHROPIC_API_KEY` | Claude — `claude-haiku-4-5` (plan/evaluate) + `claude-sonnet-4-6` (answer) |
+| `openai` | `OPENAI_API_KEY` | OpenAI or any OpenAI-compatible hosted API (`OPENAI_BASE_URL`) |
+| `vllm` | a running vLLM server + `VLLM_MODEL` | Local model via vLLM's OpenAI-compatible API |
+
+Leave the selected provider's credentials blank to stay in DEMO mode.
+
+**Running a local model with vLLM:**
+
+```bash
+pip install vllm
+vllm serve meta-llama/Llama-3.1-8B-Instruct --port 8001
+```
+
+Then in `backend/.env`:
+
+```bash
+LLM_PROVIDER=vllm
+VLLM_BASE_URL=http://localhost:8001/v1
+VLLM_MODEL=meta-llama/Llama-3.1-8B-Instruct
+```
+
+(OpenAI and vLLM share one code path — vLLM just points the OpenAI SDK at a local
+`base_url`.)
 
 ---
 
@@ -38,17 +71,14 @@ Browser (Next.js, React, SVG diagrams)
 FastAPI backend
    ├─ DemoOrchestrator        emits diagram-synced steps
    ├─ InMemoryRetriever       real TF-IDF + cosine vector search (NumPy)
-   └─ ClaudeService           plan / evaluate (structured output) / generate (streamed)
-          │
+   └─ LLMService              plan / evaluate / generate (streamed)
+          │  one interface, pluggable backend (LLM_PROVIDER)
           ▼
-   Anthropic Claude API   (only external dependency; optional — DEMO mode if absent)
+   Anthropic Claude  ·  OpenAI  ·  local vLLM   (optional — DEMO mode if absent)
 ```
 
 Each streamed step carries `highlight` node IDs that exactly match the IDs in the
 React diagram components, which is what keeps the picture and the code in sync.
-
-**Models** (configurable): `claude-haiku-4-5` for the fast plan/evaluate steps and
-`claude-sonnet-4-6` for answer synthesis — chosen for low latency in a live setting.
 
 ---
 
@@ -60,8 +90,8 @@ React diagram components, which is what keeps the picture and the code in sync.
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r backend/requirements.txt
 
-# optional: enable live Claude calls
-cp backend/.env.example backend/.env   # then edit ANTHROPIC_API_KEY
+# optional: go live — pick a provider and add its credentials
+cp backend/.env.example backend/.env   # then set LLM_PROVIDER + that provider's keys
 
 uvicorn backend.main:app --reload --port 8000
 ```
@@ -107,8 +137,12 @@ backend/
     demo_data.py              the demo knowledge base + example queries
   services/
     retrieval.py              real in-process TF-IDF vector search
-    claude_integration.py     async Claude: plan / evaluate / generate (streamed)
     demo_orchestrator.py      drives all three demos, emits diagram-synced events
+    llm/                      pluggable LLM backends behind one interface
+      base.py                 LLMService protocol + shared prompts/parsing
+      anthropic_provider.py   Claude
+      openai_provider.py      OpenAI + vLLM (OpenAI-compatible)
+      demo_provider.py        deterministic offline fallback
   routers/
     demo.py                   GET /demo/stream (SSE), /demo/examples
     health.py                 GET /health

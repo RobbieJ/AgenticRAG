@@ -40,6 +40,7 @@ class DemoEvent(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     version: str
+    provider: str
     demo_mode: bool
     answer_model: str
     fast_model: str

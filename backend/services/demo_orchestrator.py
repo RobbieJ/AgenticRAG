@@ -16,7 +16,7 @@ from typing import AsyncGenerator, Optional
 
 from backend.config import settings
 from backend.models.schemas import DemoEvent, DemoType
-from backend.services.claude_integration import ClaudeService
+from backend.services.llm import get_llm_service
 from backend.services.retrieval import retriever
 
 # Pacing between scripted steps so a presenter can narrate.
@@ -25,7 +25,7 @@ STEP_PAUSE = 1.4
 
 class DemoOrchestrator:
     def __init__(self) -> None:
-        self.claude = ClaudeService()
+        self.llm = get_llm_service()
 
     async def run(
         self, demo_type: DemoType, query: Optional[str] = None
@@ -121,11 +121,11 @@ class DemoOrchestrator:
 
         for iteration in range(1, settings.max_iterations + 1):
             # PLAN
-            rewritten = await self.claude.plan(query, feedback)
+            rewritten = await self.llm.plan(query, feedback)
             yield DemoEvent(
                 step=(step := step + 1), phase="PLAN", title="Plan",
                 description=f"Rewrote the query for retrieval: “{rewritten}”",
-                code=f'rewritten = claude.plan(query{", feedback" if feedback else ""})',
+                code=f'rewritten = llm.plan(query{", feedback" if feedback else ""})',
                 highlight=["plan"], iteration=iteration,
             )
             await asyncio.sleep(0.5)
@@ -143,11 +143,11 @@ class DemoOrchestrator:
             await asyncio.sleep(0.5)
 
             # EVALUATE
-            verdict = await self.claude.evaluate(query, documents)
+            verdict = await self.llm.evaluate(query, documents)
             yield DemoEvent(
                 step=(step := step + 1), phase="EVALUATE", title="Evaluate",
                 description="Is the evidence relevant and sufficient?",
-                code="verdict = claude.evaluate(query, docs)",
+                code="verdict = llm.evaluate(query, docs)",
                 highlight=["evaluate"], score=verdict["score"],
                 reasoning=verdict["reasoning"], iteration=iteration,
             )
@@ -172,11 +172,11 @@ class DemoOrchestrator:
         yield DemoEvent(
             step=gen_step, phase="GENERATE", title="Generate",
             description="Synthesizing a grounded answer from the evidence.",
-            code="for chunk in claude.generate(query, docs): ...",
+            code="for chunk in llm.generate(query, docs): ...",
             highlight=["generate"], answer="",
         )
         full = ""
-        async for chunk in self.claude.generate(query, documents):
+        async for chunk in self.llm.generate(query, documents):
             full += chunk
             yield DemoEvent(step=gen_step, phase="GENERATE", title="Generate",
                             highlight=["generate"], answer_delta=chunk)

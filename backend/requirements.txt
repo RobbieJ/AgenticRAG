@@ -7,8 +7,11 @@ pydantic==2.10.3
 pydantic-settings==2.6.1
 python-dotenv==1.0.1
 
+# LLM providers
 # Anthropic Claude (0.107+ supports output_config structured outputs)
 anthropic==0.107.0
+# OpenAI SDK — also drives local vLLM (OpenAI-compatible /v1 API)
+openai==2.41.0
 
 # Retrieval (real, in-process vector search — no external services required)
 numpy==2.2.0

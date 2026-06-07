@@ -15,6 +15,7 @@ async def health() -> HealthResponse:
     return HealthResponse(
         status="ok",
         version=settings.api_version,
+        provider=settings.llm_provider,
         demo_mode=settings.demo_mode,
         answer_model=settings.answer_model,
         fast_model=settings.fast_model,

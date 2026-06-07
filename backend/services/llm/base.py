@@ -3,9 +3,17 @@
 from __future__ import annotations
 
 import json
-from typing import AsyncGenerator, Dict, List, Optional, Protocol, runtime_checkable
+from typing import AsyncGenerator, Dict, List, Optional, Protocol, Tuple, runtime_checkable
 
 from backend.config import settings
+
+# Usage is a simple {"in": prompt_tokens, "out": completion_tokens} dict.
+Usage = Dict[str, int]
+
+
+def estimate_tokens(text: str) -> int:
+    """Rough token estimate (~4 chars/token) for DEMO mode and provider fallbacks."""
+    return max(1, round(len(text or "") / 4))
 
 # JSON schema for the EVALUATE step's structured output.
 EVAL_SCHEMA = {
@@ -33,13 +41,18 @@ GENERATE_SYSTEM = (
 
 @runtime_checkable
 class LLMService(Protocol):
-    """Every provider implements these three loop operations plus identity fields."""
+    """Every provider implements these three loop operations plus identity fields.
+
+    ``plan`` and ``evaluate`` return ``(result, usage)``. ``generate`` streams text
+    and records the generation's token usage on ``last_usage`` once the stream ends.
+    """
 
     provider: str
+    last_usage: Usage
 
-    async def plan(self, query: str, feedback: Optional[str] = None) -> str: ...
+    async def plan(self, query: str, feedback: Optional[str] = None) -> Tuple[str, Usage]: ...
 
-    async def evaluate(self, query: str, documents: List[Dict]) -> Dict: ...
+    async def evaluate(self, query: str, documents: List[Dict]) -> Tuple[Dict, Usage]: ...
 
     def generate(self, query: str, documents: List[Dict]) -> AsyncGenerator[str, None]: ...
 

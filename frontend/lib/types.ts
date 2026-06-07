@@ -14,6 +14,10 @@ export interface DemoEvent {
   answer_delta?: string | null;
   answer?: string | null;
   iteration?: number | null;
+  tokens_in?: number | null;
+  tokens_out?: number | null;
+  cumulative_tokens?: number | null;
+  baseline_tokens?: number | null;
   done?: boolean;
 }
 

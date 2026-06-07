@@ -114,42 +114,50 @@ class DemoOrchestrator:
         step = 0
         feedback: Optional[str] = None
         documents: list = []
+        cumulative = 0  # running total for the Token Burn meter
+
+        def tot(usage: dict) -> int:
+            return int(usage.get("in", 0)) + int(usage.get("out", 0))
 
         yield DemoEvent(step=(step := step + 1), phase="QUERY", title="User query",
-                        description=query, highlight=["query"])
+                        description=query, highlight=["query"], cumulative_tokens=cumulative)
         await asyncio.sleep(0.6)
 
         for iteration in range(1, settings.max_iterations + 1):
             # PLAN
-            rewritten = await self.llm.plan(query, feedback)
+            rewritten, usage = await self.llm.plan(query, feedback)
+            cumulative += tot(usage)
             yield DemoEvent(
                 step=(step := step + 1), phase="PLAN", title="Plan",
                 description=f"Rewrote the query for retrieval: “{rewritten}”",
                 code=f'rewritten = llm.plan(query{", feedback" if feedback else ""})',
                 highlight=["plan"], iteration=iteration,
+                tokens_in=usage["in"], tokens_out=usage["out"], cumulative_tokens=cumulative,
             )
             await asyncio.sleep(0.5)
 
-            # RETRIEVE
+            # RETRIEVE (local vector search — no LLM tokens)
             documents = retriever.retrieve(rewritten, top_k=settings.retrieval_top_k)
             yield DemoEvent(
                 step=(step := step + 1), phase="RETRIEVE", title="Retrieve",
-                description=f"Vector search returned {len(documents)} documents.",
+                description=f"Vector search returned {len(documents)} documents (0 LLM tokens).",
                 code="docs = retriever.retrieve(rewritten, top_k=4)",
                 highlight=["retrieve", "tools"],
                 documents=[{"id": d["id"], "title": d["title"], "score": d["score"]} for d in documents],
-                iteration=iteration,
+                iteration=iteration, cumulative_tokens=cumulative,
             )
             await asyncio.sleep(0.5)
 
             # EVALUATE
-            verdict = await self.llm.evaluate(query, documents)
+            verdict, usage = await self.llm.evaluate(query, documents)
+            cumulative += tot(usage)
             yield DemoEvent(
                 step=(step := step + 1), phase="EVALUATE", title="Evaluate",
                 description="Is the evidence relevant and sufficient?",
                 code="verdict = llm.evaluate(query, docs)",
                 highlight=["evaluate"], score=verdict["score"],
                 reasoning=verdict["reasoning"], iteration=iteration,
+                tokens_in=usage["in"], tokens_out=usage["out"], cumulative_tokens=cumulative,
             )
             await asyncio.sleep(0.5)
 
@@ -163,7 +171,7 @@ class DemoOrchestrator:
                 description=f"Confidence {verdict['score']:.2f} < {settings.evaluation_threshold}. "
                             f"Refining the query and retrieving again.",
                 code="feedback = verdict.reasoning  # loop back to PLAN",
-                highlight=["refine"], iteration=iteration,
+                highlight=["refine"], iteration=iteration, cumulative_tokens=cumulative,
             )
             await asyncio.sleep(0.6)
 
@@ -173,7 +181,7 @@ class DemoOrchestrator:
             step=gen_step, phase="GENERATE", title="Generate",
             description="Synthesizing a grounded answer from the evidence.",
             code="for chunk in llm.generate(query, docs): ...",
-            highlight=["generate"], answer="",
+            highlight=["generate"], answer="", cumulative_tokens=cumulative,
         )
         full = ""
         async for chunk in self.llm.generate(query, documents):
@@ -181,11 +189,25 @@ class DemoOrchestrator:
             yield DemoEvent(step=gen_step, phase="GENERATE", title="Generate",
                             highlight=["generate"], answer_delta=chunk)
 
+        gen_usage = self.llm.last_usage
+        cumulative += tot(gen_usage)
+        # Classic single-pass RAG cost ≈ one generation call (embed + 1x generate).
+        baseline = tot(gen_usage)
+        # Trailing GENERATE event carries the generation's token usage (merges into
+        # the same step on the client; serialized with exclude_none so the streamed
+        # answer is preserved).
+        yield DemoEvent(
+            step=gen_step, phase="GENERATE", title="Generate", highlight=["generate"],
+            tokens_in=gen_usage["in"], tokens_out=gen_usage["out"],
+            cumulative_tokens=cumulative, iteration=iteration,
+        )
+
         # VERIFY
         yield DemoEvent(
             step=(step := step + 1), phase="VERIFY", title="Verify",
             description="Answer checked against retrieved evidence before returning.",
             code="assert grounded_in(answer, docs)", highlight=["verify"],
+            cumulative_tokens=cumulative,
         )
         await asyncio.sleep(0.5)
 
@@ -195,5 +217,5 @@ class DemoOrchestrator:
             description="High confidence with citations — loop stops.",
             highlight=["answer"], answer=full,
             documents=[{"id": d["id"], "title": d["title"], "score": d["score"]} for d in documents],
-            done=True,
+            cumulative_tokens=cumulative, baseline_tokens=baseline, done=True,
         )

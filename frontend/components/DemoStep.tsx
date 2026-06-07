@@ -37,9 +37,16 @@ export function DemoStep({ step, active }: { step: DemoStepData; active: boolean
           {step.phase}
         </span>
         <span className="font-semibold text-gray-900">{step.title}</span>
-        {step.iteration ? (
-          <span className="ml-auto text-xs text-gray-400">iteration {step.iteration}</span>
-        ) : null}
+        <div className="ml-auto flex items-center gap-2">
+          {(step.tokens_in || step.tokens_out) ? (
+            <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-violet-600">
+              +{((step.tokens_in ?? 0) + (step.tokens_out ?? 0)).toLocaleString()} tok
+            </span>
+          ) : null}
+          {step.iteration ? (
+            <span className="text-xs text-gray-400">iteration {step.iteration}</span>
+          ) : null}
+        </div>
       </div>
 
       {step.description && (

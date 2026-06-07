@@ -7,13 +7,15 @@ key, and the model name.
 
 from __future__ import annotations
 
-from typing import AsyncGenerator, Dict, List, Optional
+from typing import AsyncGenerator, Dict, List, Optional, Tuple
 
 from openai import AsyncOpenAI
 
 from backend.services.llm.base import (
     EVAL_SYSTEM,
     GENERATE_SYSTEM,
+    Usage,
+    estimate_tokens,
     eval_user_prompt,
     generate_user_prompt,
     parse_eval,
@@ -35,22 +37,25 @@ class OpenAICompatibleService:
         self.answer_model = answer_model
         # vLLM accepts any non-empty key; OpenAI uses the real one.
         self.client = AsyncOpenAI(api_key=api_key or "EMPTY", base_url=base_url)
+        self.last_usage: Usage = {"in": 0, "out": 0}
 
-    async def plan(self, query: str, feedback: Optional[str] = None) -> str:
+    async def plan(self, query: str, feedback: Optional[str] = None) -> Tuple[str, Usage]:
+        prompt = plan_prompt(query, feedback)
         resp = await self.client.chat.completions.create(
             model=self.fast_model,
             max_tokens=120,
-            messages=[{"role": "user", "content": plan_prompt(query, feedback)}],
+            messages=[{"role": "user", "content": prompt}],
         )
-        return (resp.choices[0].message.content or "").strip() or query
+        text = (resp.choices[0].message.content or "").strip() or query
+        return text, self._usage(resp, prompt, text)
 
-    async def evaluate(self, query: str, documents: List[Dict]) -> Dict:
+    async def evaluate(self, query: str, documents: List[Dict]) -> Tuple[Dict, Usage]:
+        user = eval_user_prompt(query, documents)
         messages = [
             {"role": "system", "content": EVAL_SYSTEM},
-            {"role": "user", "content": eval_user_prompt(query, documents)},
+            {"role": "user", "content": user},
         ]
-        # Prefer JSON-mode where supported; fall back for models/servers that
-        # reject response_format (some vLLM builds). parse_eval is lenient either way.
+        # Prefer JSON-mode where supported; fall back for servers that reject it.
         try:
             resp = await self.client.chat.completions.create(
                 model=self.fast_model,
@@ -64,23 +69,47 @@ class OpenAICompatibleService:
                 max_tokens=300,
                 messages=messages,
             )
-        return parse_eval(resp.choices[0].message.content or "")
+        raw = resp.choices[0].message.content or ""
+        return parse_eval(raw), self._usage(resp, EVAL_SYSTEM + user, raw)
 
     async def generate(
         self, query: str, documents: List[Dict]
     ) -> AsyncGenerator[str, None]:
+        prompt = generate_user_prompt(query, documents)
         stream = await self.client.chat.completions.create(
             model=self.answer_model,
             max_tokens=600,
             messages=[
                 {"role": "system", "content": GENERATE_SYSTEM},
-                {"role": "user", "content": generate_user_prompt(query, documents)},
+                {"role": "user", "content": prompt},
             ],
             stream=True,
+            stream_options={"include_usage": True},
         )
+        full = ""
+        usage = None
         async for chunk in stream:
-            if not chunk.choices:
-                continue
-            delta = chunk.choices[0].delta.content
-            if delta:
-                yield delta
+            if getattr(chunk, "usage", None):
+                usage = chunk.usage  # final usage-only chunk
+            if chunk.choices:
+                delta = chunk.choices[0].delta.content
+                if delta:
+                    full += delta
+                    yield delta
+        if usage is not None:
+            self.last_usage = {
+                "in": usage.prompt_tokens or 0,
+                "out": usage.completion_tokens or 0,
+            }
+        else:  # server didn't return usage — estimate
+            self.last_usage = {
+                "in": estimate_tokens(GENERATE_SYSTEM + prompt),
+                "out": estimate_tokens(full),
+            }
+
+    @staticmethod
+    def _usage(resp, prompt_text: str, output_text: str) -> Usage:
+        u = getattr(resp, "usage", None)
+        if u is not None:
+            return {"in": u.prompt_tokens or 0, "out": u.completion_tokens or 0}
+        return {"in": estimate_tokens(prompt_text), "out": estimate_tokens(output_text)}

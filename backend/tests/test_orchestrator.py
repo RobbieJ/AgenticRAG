@@ -44,6 +44,25 @@ async def test_agentic_loop_runs_and_produces_grounded_answer():
 
 
 @pytest.mark.asyncio
+async def test_token_burn_accounting():
+    events = await _collect(DemoType.AGENTIC_LOOP, "What is prompt engineering?")
+
+    # Cumulative tokens are reported and never decrease.
+    cums = [e.cumulative_tokens for e in events if e.cumulative_tokens is not None]
+    assert cums and cums == sorted(cums)
+    assert cums[-1] > 0
+
+    # Per-step token attribution exists for LLM steps, tagged by iteration.
+    iters = {e.iteration for e in events if e.tokens_in and e.iteration}
+    assert len(iters) >= 1
+
+    # The whole point: agentic RAG burns MORE than a classic single pass.
+    final = events[-1]
+    assert final.baseline_tokens and final.baseline_tokens > 0
+    assert final.cumulative_tokens > final.baseline_tokens
+
+
+@pytest.mark.asyncio
 async def test_highlight_ids_are_known_nodes():
     events = await _collect(DemoType.AGENTIC_LOOP, "How does agentic RAG work?")
     known = {"query", "plan", "retrieve", "evaluate", "refine",

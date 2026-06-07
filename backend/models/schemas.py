@@ -34,6 +34,11 @@ class DemoEvent(BaseModel):
     answer_delta: Optional[str] = None
     answer: Optional[str] = None
     iteration: Optional[int] = None
+    # Token accounting for the "Token Burn" meter.
+    tokens_in: Optional[int] = None
+    tokens_out: Optional[int] = None
+    cumulative_tokens: Optional[int] = None
+    baseline_tokens: Optional[int] = None  # classic single-pass RAG, for comparison
     done: bool = False
 
 

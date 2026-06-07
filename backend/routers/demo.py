@@ -29,7 +29,9 @@ async def stream_demo(
     async def event_generator():
         try:
             async for event in orchestrator.run(demoType, query):
-                yield f"data: {event.model_dump_json()}\n\n"
+                # exclude_none so partial events (e.g. trailing token-only updates)
+                # merge cleanly on the client without nulling existing step fields.
+                yield f"data: {event.model_dump_json(exclude_none=True)}\n\n"
             yield "event: end\ndata: {}\n\n"
         except asyncio.CancelledError:  # client disconnected
             raise

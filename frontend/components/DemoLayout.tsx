@@ -10,6 +10,7 @@ import { fetchExamples, streamDemo } from "@/lib/api-client";
 import { DiagramViewer } from "./DiagramViewer";
 import { ExecutionFlow } from "./ExecutionFlow";
 import { BackendStatus } from "./BackendStatus";
+import { TokenBurn } from "./TokenBurn";
 
 export function DemoLayout({ demoType }: { demoType: DemoType }) {
   const config = DEMO_CONFIGS[demoType];
@@ -125,15 +126,23 @@ export function DemoLayout({ demoType }: { demoType: DemoType }) {
         </button>
       )}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <h2 className="mb-3 text-lg font-bold text-gray-900">Flow diagram</h2>
-          <DiagramViewer demoType={demoType} highlight={highlight} />
-        </motion.div>
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <h2 className="mb-3 text-lg font-bold text-gray-900">Live execution</h2>
-          <ExecutionFlow steps={steps} running={running} />
-        </motion.div>
+      <div className="flex flex-col gap-6 xl:flex-row">
+        <div className="grid flex-1 grid-cols-1 gap-6 lg:grid-cols-2">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <h2 className="mb-3 text-lg font-bold text-gray-900">Flow diagram</h2>
+            <DiagramViewer demoType={demoType} highlight={highlight} />
+          </motion.div>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <h2 className="mb-3 text-lg font-bold text-gray-900">Live execution</h2>
+            <ExecutionFlow steps={steps} running={running} />
+          </motion.div>
+        </div>
+
+        {config.interactive && (
+          <aside className="xl:w-64 xl:shrink-0">
+            <TokenBurn steps={steps} />
+          </aside>
+        )}
       </div>
     </div>
   );

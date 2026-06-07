@@ -3,16 +3,40 @@
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
+import { useEffect, useState } from "react";
 
-function RedHatMark() {
-  // Stylized fedora mark (not the official trademarked lockup).
+// Drop the official Red Hat logo asset at this path (see public/brand/README.md).
+// We never recreate the logo — until the asset exists, a text wordmark is shown.
+const LOGO_SRC = "/brand/redhat-logo.svg";
+
+function BrandLockup() {
+  // Preload the asset; only render the <img> once it actually loads, so a missing
+  // logo never shows a broken-image icon.
+  const [hasLogo, setHasLogo] = useState(false);
+
+  useEffect(() => {
+    const img = new window.Image();
+    img.onload = () => setHasLogo(true);
+    img.onerror = () => setHasLogo(false);
+    img.src = LOGO_SRC;
+  }, []);
+
   return (
-    <span className="grid h-9 w-9 place-items-center rounded-xl bg-brand shadow-[0_4px_14px_-4px_rgba(238,0,0,0.6)]">
-      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden>
-        <ellipse cx="12" cy="15.6" rx="9" ry="2.7" fill="white" />
-        <path d="M7.4 15.2C7.4 9.6 9 7 12 7s4.6 2.6 4.6 8.2Z" fill="white" />
-      </svg>
-    </span>
+    <Link href="/" className="flex items-center gap-3">
+      {hasLogo && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={LOGO_SRC} alt="Red Hat" className="h-8 w-auto" />
+      )}
+      <span
+        className={
+          hasLogo
+            ? "font-display text-lg font-medium text-ink-muted"
+            : "font-display text-lg font-extrabold tracking-tight text-ink"
+        }
+      >
+        Agentic RAG
+      </span>
+    </Link>
   );
 }
 
@@ -24,18 +48,7 @@ export function Header() {
   return (
     <header className="glass sticky top-0 z-50 border-b border-black/5">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3.5 sm:px-8">
-        <Link href="/" className="flex items-center gap-3">
-          <RedHatMark />
-          <span className="flex items-baseline gap-2">
-            <span className="font-display text-lg font-extrabold tracking-tight text-ink">
-              Red Hat
-            </span>
-            <span className="hidden text-ink-muted sm:inline">·</span>
-            <span className="hidden font-display text-lg font-medium text-ink-muted sm:inline">
-              Agentic RAG
-            </span>
-          </span>
-        </Link>
+        <BrandLockup />
 
         {!isHome && (
           <button

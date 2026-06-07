@@ -6,9 +6,9 @@ from backend.models.schemas import DemoType
 from backend.services.demo_orchestrator import DemoOrchestrator
 
 
-async def _collect(demo_type, query=None):
+async def _collect(demo_type, query=None, mode="agentic"):
     orch = DemoOrchestrator()
-    return [ev async for ev in orch.run(demo_type, query)]
+    return [ev async for ev in orch.run(demo_type, query, mode)]
 
 
 @pytest.mark.asyncio
@@ -60,6 +60,24 @@ async def test_token_burn_accounting():
     final = events[-1]
     assert final.baseline_tokens and final.baseline_tokens > 0
     assert final.cumulative_tokens > final.baseline_tokens
+
+
+@pytest.mark.asyncio
+async def test_classic_mode_is_single_pass_and_cheaper():
+    q = "What is prompt engineering?"
+    classic = await _collect(DemoType.AGENTIC_LOOP, q, mode="classic")
+    agentic = await _collect(DemoType.AGENTIC_LOOP, q, mode="agentic")
+
+    phases = {e.phase for e in classic}
+    assert "PLAN" not in phases and "EVALUATE" not in phases and "REFINE" not in phases
+    assert classic[-1].phase == "COMPLETE" and classic[-1].done
+    assert classic[-1].answer
+
+    classic_total = classic[-1].cumulative_tokens
+    agentic_total = agentic[-1].cumulative_tokens
+    assert classic_total and classic_total > 0
+    # The whole point of the comparison: classic burns fewer tokens.
+    assert classic_total < agentic_total
 
 
 @pytest.mark.asyncio

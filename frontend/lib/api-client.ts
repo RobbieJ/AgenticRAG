@@ -12,13 +12,14 @@ const BACKEND_URL =
 export function streamDemo(
   demoType: DemoType,
   query: string | undefined,
+  mode: "agentic" | "classic",
   handlers: {
     onEvent: (event: DemoEvent) => void;
     onEnd?: () => void;
     onError?: (message: string) => void;
   },
 ): () => void {
-  const params = new URLSearchParams({ demoType });
+  const params = new URLSearchParams({ demoType, mode });
   if (query) params.set("query", query);
   const url = `${BACKEND_URL}/demo/stream?${params.toString()}`;
 

@@ -3,54 +3,71 @@
 import { create } from "zustand";
 import { DemoEvent, DemoStepData } from "@/lib/types";
 
+export type Track = "agentic" | "classic";
+
 interface DemoState {
-  steps: DemoStepData[];
+  agentic: DemoStepData[];
+  classic: DemoStepData[];
   highlight: string[];
   running: boolean;
+  activeTrack: Track;
   error: string | null;
 
-  start: () => void;
-  ingest: (event: DemoEvent) => void;
+  startRun: (track: Track) => void;
+  ingest: (track: Track, event: DemoEvent) => void;
   finish: () => void;
   fail: (message: string) => void;
-  reset: () => void;
+  resetAll: () => void;
+}
+
+function merge(steps: DemoStepData[], event: DemoEvent): DemoStepData[] {
+  // Streamed answer deltas accumulate into the matching step.
+  if (event.answer_delta) {
+    return steps.map((s) =>
+      s.step === event.step
+        ? { ...s, answer: (s.answer ?? "") + event.answer_delta }
+        : s,
+    );
+  }
+  const idx = steps.findIndex((s) => s.step === event.step);
+  if (idx >= 0) {
+    const next = [...steps];
+    next[idx] = { ...next[idx], ...event };
+    return next;
+  }
+  return [...steps, event];
 }
 
 export const useDemo = create<DemoState>((set) => ({
-  steps: [],
+  agentic: [],
+  classic: [],
   highlight: [],
   running: false,
+  activeTrack: "agentic",
   error: null,
 
-  start: () => set({ steps: [], highlight: [], running: true, error: null }),
+  startRun: (track) =>
+    set((state) => ({
+      running: true,
+      error: null,
+      activeTrack: track,
+      highlight: [],
+      // clear only the track that's (re)starting
+      agentic: track === "agentic" ? [] : state.agentic,
+      classic: track === "classic" ? [] : state.classic,
+    })),
 
-  ingest: (event) =>
+  ingest: (track, event) =>
     set((state) => {
       const highlight = event.highlight?.length ? event.highlight : state.highlight;
-
-      // Streamed answer deltas merge into the matching step rather than
-      // creating new steps.
-      if (event.answer_delta) {
-        const steps = state.steps.map((s) =>
-          s.step === event.step
-            ? { ...s, answer: (s.answer ?? "") + event.answer_delta }
-            : s,
-        );
-        return { steps, highlight };
+      if (track === "classic") {
+        return { classic: merge(state.classic, event), highlight };
       }
-
-      // Replace an existing step with the same number (e.g. GENERATE finalize),
-      // otherwise append.
-      const idx = state.steps.findIndex((s) => s.step === event.step);
-      if (idx >= 0) {
-        const steps = [...state.steps];
-        steps[idx] = { ...steps[idx], ...event };
-        return { steps, highlight };
-      }
-      return { steps: [...state.steps, event], highlight };
+      return { agentic: merge(state.agentic, event), highlight };
     }),
 
   finish: () => set({ running: false }),
   fail: (message) => set({ running: false, error: message }),
-  reset: () => set({ steps: [], highlight: [], running: false, error: null }),
+  resetAll: () =>
+    set({ agentic: [], classic: [], highlight: [], running: false, error: null, activeTrack: "agentic" }),
 }));

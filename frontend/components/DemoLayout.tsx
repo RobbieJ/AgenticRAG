@@ -14,17 +14,29 @@ import { TokenBurn } from "./TokenBurn";
 
 export function DemoLayout({ demoType }: { demoType: DemoType }) {
   const config = DEMO_CONFIGS[demoType];
-  const { steps, highlight, running, error, start, ingest, finish, fail, reset } = useDemo();
+  const {
+    agentic,
+    classic,
+    highlight,
+    running,
+    activeTrack,
+    error,
+    startRun,
+    ingest,
+    finish,
+    fail,
+    resetAll,
+  } = useDemo();
 
   const [query, setQuery] = useState("");
   const [examples, setExamples] = useState<string[]>([]);
+  const [compare, setCompare] = useState(false);
   const stopRef = useRef<(() => void) | null>(null);
 
-  // Reset store when switching demos; stop any in-flight stream.
   useEffect(() => {
-    reset();
+    resetAll();
     return () => stopRef.current?.();
-  }, [demoType, reset]);
+  }, [demoType, resetAll]);
 
   useEffect(() => {
     if (config.interactive) fetchExamples().then(setExamples);
@@ -33,23 +45,40 @@ export function DemoLayout({ demoType }: { demoType: DemoType }) {
   const run = useCallback(
     (q?: string) => {
       stopRef.current?.();
-      start();
-      stopRef.current = streamDemo(demoType, q, {
-        onEvent: ingest,
-        onEnd: finish,
-        onError: fail,
-      });
+      resetAll();
+
+      const runAgentic = () => {
+        startRun("agentic");
+        stopRef.current = streamDemo(demoType, q, "agentic", {
+          onEvent: (e) => ingest("agentic", e),
+          onEnd: finish,
+          onError: fail,
+        });
+      };
+
+      // Compare mode: run the classic single pass first, then the agentic loop.
+      if (config.interactive && compare) {
+        startRun("classic");
+        stopRef.current = streamDemo(demoType, q, "classic", {
+          onEvent: (e) => ingest("classic", e),
+          onError: fail,
+          onEnd: runAgentic,
+        });
+      } else {
+        runAgentic();
+      }
     },
-    [demoType, start, ingest, finish, fail],
+    [demoType, compare, config.interactive, startRun, ingest, finish, fail, resetAll],
   );
 
-  // Auto-play scripted demos once on load.
   useEffect(() => {
     if (!config.interactive) {
       const t = setTimeout(() => run(), 400);
       return () => clearTimeout(t);
     }
   }, [config.interactive, run]);
+
+  const activeSteps = activeTrack === "classic" ? classic : agentic;
 
   return (
     <div className="space-y-5">
@@ -86,15 +115,42 @@ export function DemoLayout({ demoType }: { demoType: DemoType }) {
               {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
               {running ? "Running" : "Run"}
             </button>
-            {steps.length > 0 && !running && (
+            {(agentic.length > 0 || classic.length > 0) && !running && (
               <button
-                onClick={reset}
+                onClick={resetAll}
                 className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-200 px-4 py-2 font-semibold text-gray-700 transition hover:bg-gray-300"
               >
                 <RotateCcw className="h-4 w-4" /> Reset
               </button>
             )}
           </div>
+
+          {/* Compare-with-classic toggle */}
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={compare}
+              onClick={() => !running && setCompare((c) => !c)}
+              disabled={running}
+              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition disabled:opacity-50 ${
+                compare ? "bg-violet-600" : "bg-gray-300"
+              }`}
+            >
+              <span
+                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+                  compare ? "translate-x-5" : "translate-x-0.5"
+                }`}
+              />
+            </button>
+            <div className="text-sm">
+              <span className="font-semibold text-gray-800">Compare with Classic RAG</span>
+              <span className="ml-2 text-gray-500">
+                runs the single-pass pipeline first, then the agentic loop — both bars side by side
+              </span>
+            </div>
+          </div>
+
           {examples.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2">
               {examples.map((ex) => (
@@ -133,14 +189,21 @@ export function DemoLayout({ demoType }: { demoType: DemoType }) {
             <DiagramViewer demoType={demoType} highlight={highlight} />
           </motion.div>
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <h2 className="mb-3 text-lg font-bold text-gray-900">Live execution</h2>
-            <ExecutionFlow steps={steps} running={running} />
+            <h2 className="mb-3 text-lg font-bold text-gray-900">
+              Live execution
+              {compare && (
+                <span className="ml-2 align-middle text-xs font-medium text-gray-400">
+                  {activeTrack === "classic" ? "· classic pass" : "· agentic loop"}
+                </span>
+              )}
+            </h2>
+            <ExecutionFlow steps={activeSteps} running={running} />
           </motion.div>
         </div>
 
         {config.interactive && (
-          <aside className="xl:w-64 xl:shrink-0">
-            <TokenBurn steps={steps} />
+          <aside className="xl:w-72 xl:shrink-0">
+            <TokenBurn agentic={agentic} classic={compare ? classic : null} />
           </aside>
         )}
       </div>

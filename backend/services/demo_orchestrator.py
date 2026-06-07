@@ -28,7 +28,7 @@ class DemoOrchestrator:
         self.llm = get_llm_service()
 
     async def run(
-        self, demo_type: DemoType, query: Optional[str] = None
+        self, demo_type: DemoType, query: Optional[str] = None, mode: str = "agentic"
     ) -> AsyncGenerator[DemoEvent, None]:
         if demo_type == DemoType.WHAT_IS_AI:
             async for ev in self._what_is_ai():
@@ -37,8 +37,13 @@ class DemoOrchestrator:
             async for ev in self._rag_comparison():
                 yield ev
         else:
-            async for ev in self._agentic_loop(query or "What is agentic RAG?"):
-                yield ev
+            q = query or "What is agentic RAG?"
+            if mode == "classic":
+                async for ev in self._classic_rag(q):
+                    yield ev
+            else:
+                async for ev in self._agentic_loop(q):
+                    yield ev
 
     # ----------------------------------------------------------- DEMO 1
     async def _what_is_ai(self) -> AsyncGenerator[DemoEvent, None]:
@@ -107,6 +112,61 @@ class DemoOrchestrator:
             description="Classic RAG retrieves once and hopes. Agentic RAG evaluates its "
                         "evidence and retries until confident — robust on hard questions.",
             highlight=["a_decision"], done=True,
+        )
+
+    # ------------------------------------------------- DEMO 3b: classic (real)
+    async def _classic_rag(self, query: str) -> AsyncGenerator[DemoEvent, None]:
+        """Single-pass RAG: embed -> retrieve once -> generate. No reasoning loop.
+
+        Used by the "Compare with Classic RAG" toggle so the Token Burn meter can
+        show classic vs agentic side by side.
+        """
+        step = 0
+        cumulative = 0
+
+        yield DemoEvent(step=(step := step + 1), phase="QUERY", title="User query",
+                        description=query, highlight=["query"], cumulative_tokens=0)
+        await asyncio.sleep(0.5)
+
+        # One retrieval pass on the raw query — no planning / rewrite.
+        documents = retriever.retrieve(query, top_k=settings.retrieval_top_k)
+        yield DemoEvent(
+            step=(step := step + 1), phase="RETRIEVE", title="Retrieve (once)",
+            description="Embed the query and search once — no rewrite, no retry.",
+            code="docs = retriever.retrieve(query, top_k=4)  # single pass",
+            highlight=["retrieve", "tools"],
+            documents=[{"id": d["id"], "title": d["title"], "score": d["score"]} for d in documents],
+            cumulative_tokens=0,
+        )
+        await asyncio.sleep(0.5)
+
+        # Generate straight from that single context.
+        gen_step = (step := step + 1)
+        yield DemoEvent(
+            step=gen_step, phase="GENERATE", title="Generate",
+            description="Answer directly from the single retrieval — no evaluation.",
+            code="answer = llm.generate(query, docs)", highlight=["generate"], answer="",
+            cumulative_tokens=0,
+        )
+        full = ""
+        async for chunk in self.llm.generate(query, documents):
+            full += chunk
+            yield DemoEvent(step=gen_step, phase="GENERATE", title="Generate",
+                            highlight=["generate"], answer_delta=chunk)
+
+        usage = self.llm.last_usage
+        cumulative = int(usage.get("in", 0)) + int(usage.get("out", 0))
+        yield DemoEvent(
+            step=gen_step, phase="GENERATE", title="Generate", highlight=["generate"],
+            tokens_in=usage["in"], tokens_out=usage["out"], cumulative_tokens=cumulative,
+        )
+
+        yield DemoEvent(
+            step=(step := step + 1), phase="COMPLETE", title="Answer",
+            description="Classic RAG returns after one pass — if retrieval missed, so does the answer.",
+            highlight=["answer"], answer=full,
+            documents=[{"id": d["id"], "title": d["title"], "score": d["score"]} for d in documents],
+            cumulative_tokens=cumulative, baseline_tokens=cumulative, done=True,
         )
 
     # ----------------------------------------------------------- DEMO 3 (real)

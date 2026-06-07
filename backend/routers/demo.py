@@ -25,10 +25,11 @@ orchestrator = DemoOrchestrator()
 async def stream_demo(
     demoType: DemoType = Query(...),
     query: Optional[str] = Query(None),
+    mode: str = Query("agentic"),  # "agentic" | "classic" (agentic-loop only)
 ):
     async def event_generator():
         try:
-            async for event in orchestrator.run(demoType, query):
+            async for event in orchestrator.run(demoType, query, mode):
                 # exclude_none so partial events (e.g. trailing token-only updates)
                 # merge cleanly on the client without nulling existing step fields.
                 yield f"data: {event.model_dump_json(exclude_none=True)}\n\n"

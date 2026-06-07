@@ -84,6 +84,9 @@ React diagram components, which is what keeps the picture and the code in sync.
 
 ## Quick start
 
+> **One command:** `./scripts/dev.sh` boots both servers (creates the venv and
+> installs deps on first run). Full local + eval guide in **[RUNNING.md](RUNNING.md)**.
+
 ### 1. Backend (run from the repo root)
 
 ```bash

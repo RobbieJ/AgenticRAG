@@ -96,8 +96,7 @@ export function DemoLayout({ demoType }: { demoType: DemoType }) {
 
   const renderComponent = (key: PanelKey, focused: boolean) => {
     if (key === "diagram") return <DiagramViewer demoType={demoType} highlight={highlight} />;
-    if (key === "execution")
-      return <ExecutionFlow steps={activeSteps} running={running} expanded={focused} />;
+    if (key === "execution") return <ExecutionFlow steps={activeSteps} running={running} />;
     return (
       <TokenBurn
         agentic={agentic}
@@ -264,11 +263,19 @@ export function DemoLayout({ demoType }: { demoType: DemoType }) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
             >
-              {renderComponent(focus, true)}
+              {focus === "execution" ? (
+                <div className="h-[78vh]">{renderComponent("execution", true)}</div>
+              ) : (
+                renderComponent(focus, true)
+              )}
             </motion.div>
           </motion.div>
         ) : (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          // The left column (Flow Diagram + Token Burn) defines the height; the
+          // Live Execution column is stretched to match and its card fills that
+          // height via an absolute overlay (so its long content can't inflate the
+          // row). Result: execution top aligns with the diagram, bottom with token burn.
+          <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-12">
             <div className="space-y-6 lg:col-span-5">
               <section>
                 {panelHeader("diagram", "Flow diagram")}
@@ -279,28 +286,32 @@ export function DemoLayout({ demoType }: { demoType: DemoType }) {
                 {renderComponent("tokens", false)}
               </section>
             </div>
-            <div className="lg:col-span-7">
-              <section>
+            <div className="relative lg:col-span-7">
+              <div className="flex min-h-0 flex-col lg:absolute lg:inset-0">
                 {panelHeader("execution", "Live execution", executionExtra)}
-                {renderComponent("execution", false)}
-              </section>
+                <div className="min-h-0 flex-1">{renderComponent("execution", false)}</div>
+              </div>
             </div>
           </div>
         )
       ) : (
-        // ---- Non-interactive demos: diagram + execution ----
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        // ---- Non-interactive demos: diagram + execution (equal-height columns) ----
+        <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
           <div>
             <h2 className="mb-3 font-display text-lg font-bold tracking-tight text-ink">
               Flow diagram
             </h2>
             <DiagramViewer demoType={demoType} highlight={highlight} />
           </div>
-          <div>
-            <h2 className="mb-3 font-display text-lg font-bold tracking-tight text-ink">
-              Live execution
-            </h2>
-            <ExecutionFlow steps={activeSteps} running={running} />
+          <div className="relative">
+            <div className="flex min-h-0 flex-col lg:absolute lg:inset-0">
+              <h2 className="mb-3 font-display text-lg font-bold tracking-tight text-ink">
+                Live execution
+              </h2>
+              <div className="min-h-0 flex-1">
+                <ExecutionFlow steps={activeSteps} running={running} />
+              </div>
+            </div>
           </div>
         </div>
       )}

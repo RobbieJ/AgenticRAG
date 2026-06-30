@@ -25,6 +25,8 @@ async def lifespan(_: FastAPI):
     logger.info("Agentic RAG API starting in %s mode · provider=%s", mode, settings.llm_provider)
     if not settings.demo_mode:
         logger.info("Models: answer=%s fast=%s", settings.answer_model, settings.fast_model)
+    for warning in settings.startup_warnings():
+        logger.warning("[config] %s", warning)
     yield
 
 

@@ -13,9 +13,11 @@ deterministic, offline answers so a presenter can still drive the full UI.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import List, Literal
 
+from pydantic import ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Provider = Literal["anthropic", "openai", "vllm"]
@@ -65,6 +67,27 @@ class Settings(BaseSettings):
     evaluation_threshold: float = 0.7
     retrieval_top_k: int = 4
 
+    @field_validator("evaluation_threshold")
+    @classmethod
+    def _check_threshold(cls, v: float) -> float:
+        if not 0.0 <= v <= 1.0:
+            raise ValueError("EVALUATION_THRESHOLD must be between 0.0 and 1.0")
+        return v
+
+    @field_validator("max_iterations")
+    @classmethod
+    def _check_iterations(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("MAX_ITERATIONS must be >= 1")
+        return v
+
+    @field_validator("retrieval_top_k")
+    @classmethod
+    def _check_top_k(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("RETRIEVAL_TOP_K must be >= 1")
+        return v
+
     # --- CORS ---
     cors_origins: List[str] = [
         "http://localhost:3000",
@@ -98,5 +121,48 @@ class Settings(BaseSettings):
             "vllm": self.vllm_model,
         }[self.llm_provider]
 
+    def startup_warnings(self) -> List[str]:
+        """Non-fatal misconfiguration hints, logged at startup.
 
-settings = Settings()
+        These don't stop the app (it falls back to DEMO mode when credentials are
+        missing) but flag likely setup mistakes so a presenter isn't surprised.
+        """
+        warnings: List[str] = []
+        if self.llm_provider == "anthropic":
+            key = self.anthropic_api_key.strip()
+            if key and not key.startswith("sk-"):
+                warnings.append(
+                    "ANTHROPIC_API_KEY is set but doesn't start with 'sk-' — it may be invalid."
+                )
+        if self.llm_provider == "openai":
+            key = self.openai_api_key.strip()
+            if key and not key.startswith("sk-"):
+                warnings.append(
+                    "OPENAI_API_KEY is set but doesn't start with 'sk-' — it may be invalid."
+                )
+        if self.llm_provider == "vllm" and not self.demo_mode and not self.vllm_model.strip():
+            warnings.append(
+                "LLM_PROVIDER=vllm but VLLM_MODEL is empty — set it to the model "
+                "name vLLM was started with."
+            )
+        return warnings
+
+
+def _load_settings() -> Settings:
+    """Instantiate settings, failing fast with a readable message on bad config."""
+    try:
+        return Settings()
+    except ValidationError as exc:
+        lines = [
+            f"  - {'.'.join(str(p) for p in e['loc']) or 'config'}: {e['msg']}"
+            for e in exc.errors()
+        ]
+        sys.stderr.write(
+            "\n[config] Invalid configuration — fix these and restart:\n"
+            + "\n".join(lines)
+            + "\n\n"
+        )
+        raise SystemExit(1) from exc
+
+
+settings = _load_settings()

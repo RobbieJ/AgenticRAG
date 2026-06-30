@@ -21,6 +21,7 @@ from backend.services.llm.base import (
     parse_eval,
     plan_prompt,
 )
+from backend.services.llm.retry import friendly_message, is_retryable, retry_async
 
 
 class OpenAICompatibleService:
@@ -41,11 +42,15 @@ class OpenAICompatibleService:
 
     async def plan(self, query: str, feedback: Optional[str] = None) -> Tuple[str, Usage]:
         prompt = plan_prompt(query, feedback)
-        resp = await self.client.chat.completions.create(
-            model=self.fast_model,
-            max_tokens=120,
-            messages=[{"role": "user", "content": prompt}],
-        )
+
+        async def _call():
+            return await self.client.chat.completions.create(
+                model=self.fast_model,
+                max_tokens=120,
+                messages=[{"role": "user", "content": prompt}],
+            )
+
+        resp = await retry_async(_call, op="plan")
         text = (resp.choices[0].message.content or "").strip() or query
         return text, self._usage(resp, prompt, text)
 
@@ -55,20 +60,28 @@ class OpenAICompatibleService:
             {"role": "system", "content": EVAL_SYSTEM},
             {"role": "user", "content": user},
         ]
+
         # Prefer JSON-mode where supported; fall back for servers that reject it.
-        try:
-            resp = await self.client.chat.completions.create(
-                model=self.fast_model,
-                max_tokens=300,
-                messages=messages,
-                response_format={"type": "json_object"},
-            )
-        except Exception:
-            resp = await self.client.chat.completions.create(
-                model=self.fast_model,
-                max_tokens=300,
-                messages=messages,
-            )
+        # The fallback only triggers on a json-mode rejection — transient network
+        # failures are retried by retry_async rather than silently downgraded.
+        async def _call():
+            try:
+                return await self.client.chat.completions.create(
+                    model=self.fast_model,
+                    max_tokens=300,
+                    messages=messages,
+                    response_format={"type": "json_object"},
+                )
+            except Exception as exc:  # noqa: BLE001
+                if is_retryable(exc):
+                    raise  # let retry_async handle transient failures
+                return await self.client.chat.completions.create(
+                    model=self.fast_model,
+                    max_tokens=300,
+                    messages=messages,
+                )
+
+        resp = await retry_async(_call, op="evaluate")
         raw = resp.choices[0].message.content or ""
         return parse_eval(raw), self._usage(resp, EVAL_SYSTEM + user, raw)
 
@@ -76,26 +89,37 @@ class OpenAICompatibleService:
         self, query: str, documents: List[Dict]
     ) -> AsyncGenerator[str, None]:
         prompt = generate_user_prompt(query, documents)
-        stream = await self.client.chat.completions.create(
-            model=self.answer_model,
-            max_tokens=600,
-            messages=[
-                {"role": "system", "content": GENERATE_SYSTEM},
-                {"role": "user", "content": prompt},
-            ],
-            stream=True,
-            stream_options={"include_usage": True},
-        )
+
+        async def _open_stream():
+            return await self.client.chat.completions.create(
+                model=self.answer_model,
+                max_tokens=600,
+                messages=[
+                    {"role": "system", "content": GENERATE_SYSTEM},
+                    {"role": "user", "content": prompt},
+                ],
+                stream=True,
+                stream_options={"include_usage": True},
+            )
+
+        # Retry opening the stream (transient failures before any token); once
+        # tokens flow, a failure propagates as a friendly error.
+        stream = await retry_async(_open_stream, op="generate")
         full = ""
         usage = None
-        async for chunk in stream:
-            if getattr(chunk, "usage", None):
-                usage = chunk.usage  # final usage-only chunk
-            if chunk.choices:
-                delta = chunk.choices[0].delta.content
-                if delta:
-                    full += delta
-                    yield delta
+        try:
+            async for chunk in stream:
+                if getattr(chunk, "usage", None):
+                    usage = chunk.usage  # final usage-only chunk
+                if chunk.choices:
+                    delta = chunk.choices[0].delta.content
+                    if delta:
+                        full += delta
+                        yield delta
+        except Exception as exc:  # noqa: BLE001 — mid-stream failure
+            if not full:
+                raise RuntimeError(friendly_message(exc)) from exc
+            raise  # already partially streamed; let it surface
         if usage is not None:
             self.last_usage = {
                 "in": usage.prompt_tokens or 0,
